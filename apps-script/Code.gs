@@ -14,15 +14,11 @@
  *   ?journee=Journée 12 -> [{ equipe, joueurs: [{nom, prenom, posteFin, raison, categorie}] }]
  */
 
-// Confirmed against the live sheet via debugColors(): "Susp" cells are pure
-// red. INJURED is a guess pending confirmation (seen once on "En reprise",
-// which is recovery-adjacent rather than a clean injury sample) — TODO:
-// re-check against a body-part injury cell (e.g. "Musculaire"). PERSONAL is
-// still unconfirmed — TODO: check the fill color on a "Paternité"/"Personnel"
-// cell and update below.
-var COLOR_INJURED = '#ff00ff';   // TODO confirm (currently from "En reprise")
-var COLOR_PERSONAL = '#d9ead3';  // TODO confirm (unverified placeholder)
-var COLOR_SUSPENDED = '#ff0000'; // confirmed
+// Confirmed against the live sheet (debugColors() for red, manual cell
+// checks on Arcus/"Musculaire" and Mensah/"Paternité" for the other two).
+var COLOR_INJURED = '#ff00ff';
+var COLOR_PERSONAL = '#42ff40';
+var COLOR_SUSPENDED = '#ff0000';
 
 // TODO: confirm this is the tab at gid=1172236022 in the sheet URL.
 var SHEET_NAME = 'Liste Joueur 25-26';
