@@ -89,3 +89,14 @@ file, append `?api=<url>` to the page's own URL instead.)
 - Any `Bless/Susp` text that doesn't match `HG`/`Susp`/one of the two
   calibrated colors comes back as category `autre` with the raw sheet text
   shown, rather than being dropped silently.
+- Team logos: no verified crest image source is wired up. The frontend
+  currently renders a colored initials badge per team instead of a real
+  logo (see `teamInitials()` in `frontend/index.html`). To use real crests,
+  either supply a `{ "Angers": "https://...", ... }` URL map to swap into
+  the rendering code, or point at an API that returns them.
+- "Next journée to be played" (the default selection and the top of the
+  dropdown) is inferred by `orderedJourneeList_()` in `Code.gs`: it scans
+  the `MN` column for each journée and treats the first entirely-blank one
+  as not yet played, assuming played weeks fill in left-to-right without
+  gaps. If the sheet is ever updated out of order this heuristic can be
+  wrong for one week until the gap is filled in.

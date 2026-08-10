@@ -3,16 +3,26 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Joueurs Indisponibles Ligue 1 par Journée | Fantasy Coach</title>
-<meta name="description" content="Retrouvez, journée par journée, la liste des joueurs de Ligue 1 indisponibles (blessure, suspension, raison personnelle, hors groupe) pour chaque équipe.">
+<title>Blessures et Suspensions Ligue 1 par Journée | Fantasy Coach</title>
+<meta name="description" content="Blessures et suspensions de Ligue 1, journée par journée : découvrez, équipe par équipe, quels joueurs sont blessés, suspendus, absents pour raison personnelle ou hors groupe.">
 <link rel="canonical" href="https://l1.dnp.fantasy-coach.fr/">
 <meta name="robots" content="index, follow">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Fantasy Coach">
-<meta property="og:title" content="Joueurs Indisponibles Ligue 1 par Journée | Fantasy Coach">
-<meta property="og:description" content="La liste des joueurs indisponibles (blessure, suspension, raison personnelle, hors groupe) pour chaque équipe de Ligue 1, journée par journée.">
+<meta property="og:title" content="Blessures et Suspensions Ligue 1 par Journée | Fantasy Coach">
+<meta property="og:description" content="Blessures et suspensions de Ligue 1, journée par journée : quels joueurs sont indisponibles, équipe par équipe, et pourquoi.">
 <meta property="og:url" content="https://l1.dnp.fantasy-coach.fr/">
 <meta property="og:image" content="https://static.wixstatic.com/media/449182_b075115d95e54908bebcaaef43561929~mv2.png/v1/fill/w_174,h_174,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/newlogo.png">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "Blessures et Suspensions Ligue 1 — Fantasy Coach",
+  "url": "https://l1.dnp.fantasy-coach.fr/",
+  "description": "Blessures et suspensions de Ligue 1, journée par journée, équipe par équipe.",
+  "inLanguage": "fr"
+}
+</script>
 <style>
   :root {
     /* fantasy-coach.fr's own blue (reused from pronos.fantasy-coach.fr) so
@@ -90,16 +100,12 @@
     color: var(--muted);
     margin-bottom: 1.25rem;
   }
+  /* One card per line at every width — cards grow full-width and the
+     player rows inside lay out in aligned columns instead. */
   .team-grid {
-    display: grid;
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
     gap: 1rem;
-  }
-  @media (min-width: 640px) {
-    .team-grid { grid-template-columns: repeat(2, 1fr); }
-  }
-  @media (min-width: 960px) {
-    .team-grid { grid-template-columns: repeat(3, 1fr); }
   }
   .team-card {
     background: var(--card);
@@ -108,24 +114,64 @@
     padding: 0.9rem 1rem 1rem;
   }
   .team-card h2 {
-    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-size: 1.05rem;
     margin: 0 0 0.6rem;
     padding-bottom: 0.5rem;
     border-bottom: 2px solid var(--accent);
   }
-  .player-row {
+  .team-logo {
+    flex: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    object-fit: contain;
+  }
+  .team-logo-fallback {
+    flex: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--accent-ink);
     display: flex;
-    align-items: baseline;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.68rem;
+    font-weight: 700;
+  }
+  /* Grid, not flex: fixed track widths keep the poste column (G, DL, MO...)
+     aligned vertically across every row in every card, regardless of how
+     long each player's name or reason text is. */
+  .player-row {
+    display: grid;
+    grid-template-columns: 1.5rem minmax(0, 1.6fr) 3.25rem minmax(0, 1.4fr);
+    align-items: center;
     gap: 0.5rem;
-    padding: 0.35rem 0;
+    padding: 0.4rem 0;
     border-bottom: 1px solid var(--border);
     font-size: 0.9rem;
   }
   .player-row:last-child { border-bottom: none; }
-  .player-icon { flex: none; font-size: 1rem; }
-  .player-name { font-weight: 600; }
-  .player-poste { color: var(--muted); font-size: 0.8rem; }
-  .player-raison { margin-left: auto; color: var(--muted); font-size: 0.82rem; text-align: right; }
+  .player-icon { text-align: center; font-size: 1rem; }
+  .player-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .player-poste {
+    justify-self: start;
+    background: #eaf3fc;
+    color: var(--fc-blue);
+    font-weight: 700;
+    font-size: 0.72rem;
+    text-align: center;
+    padding: 0.15rem 0;
+    border-radius: 5px;
+    width: 2.75rem;
+  }
+  .player-raison { color: var(--muted); font-size: 0.82rem; text-align: right; }
+  @media (min-width: 640px) {
+    .player-row { grid-template-columns: 1.5rem minmax(0, 1fr) 3.25rem minmax(0, 1fr); }
+  }
   .empty-state, .error-state {
     text-align: center;
     color: var(--muted);
@@ -158,9 +204,9 @@
 </header>
 
 <main id="app">
-  <h1>Joueurs indisponibles — Ligue 1</h1>
+  <h1>Blessures et suspensions — Ligue 1</h1>
   <div class="intro">
-    <p>Choisissez une journée pour voir, équipe par équipe, les joueurs indisponibles et pourquoi (blessure, suspension, raison personnelle, ou hors groupe).</p>
+    <p>Choisissez une journée pour voir, équipe par équipe, quels joueurs sont blessés, suspendus, absents pour raison personnelle ou hors groupe.</p>
   </div>
 
   <div class="journee-picker">
@@ -226,6 +272,18 @@
     statusLine.textContent = text || '';
   }
 
+  // No verified team-crest image source is wired up yet (see README) — a
+  // colored initials badge stands in for the logo until real crest URLs
+  // are supplied, so the layout never depends on an external image 404ing.
+  function teamInitials(equipe) {
+    return String(equipe || '?')
+      .split(/\s+/)
+      .map(function (w) { return w[0]; })
+      .join('')
+      .slice(0, 3)
+      .toUpperCase();
+  }
+
   function renderTeams(teams) {
     teamGrid.innerHTML = '';
     if (!teams || teams.length === 0) {
@@ -234,7 +292,10 @@
     }
     teams.forEach(function (team) {
       var card = el('div', { class: 'team-card' });
-      card.appendChild(el('h2', { text: team.equipe }));
+      var heading = el('h2', {});
+      heading.appendChild(el('span', { class: 'team-logo-fallback', text: teamInitials(team.equipe) }));
+      heading.appendChild(el('span', { text: team.equipe }));
+      card.appendChild(heading);
       team.joueurs.forEach(function (j) {
         var categorie = REASON_ICON.hasOwnProperty(j.categorie) ? j.categorie : 'autre';
         var row = el('div', { class: 'player-row' });
@@ -273,7 +334,10 @@
       });
       select.disabled = false;
       select.addEventListener('change', function () { loadJournee(select.value); });
-      if (journees.length) loadJournee(journees[journees.length - 1]);
+      // Backend orders this list with the next journée to be played first
+      // (see Code.gs orderedJourneeList_), so the first option is the
+      // sensible default to show on load.
+      if (journees.length) loadJournee(journees[0]);
     })
     .catch(function (err) {
       select.innerHTML = '';
