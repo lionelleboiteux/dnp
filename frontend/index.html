@@ -156,6 +156,10 @@
   }
   .player-row:last-child { border-bottom: none; }
   .player-icon { text-align: center; font-size: 1rem; }
+  /* Plain "+" styled in CSS, not an emoji: the ➕ emoji renders in
+     inconsistent (often non-red) colors across platforms, and CSS color
+     doesn't apply to color-emoji glyphs. This guarantees red everywhere. */
+  .player-icon.icon-blessure { color: #dc2626; font-weight: 800; font-size: 1.3rem; line-height: 1; }
   .player-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .player-poste {
     justify-self: start;
@@ -218,7 +222,7 @@
 
   <div class="legend">
     <span>🟥 Suspendu</span>
-    <span>➕ Blessé</span>
+    <span><strong style="color:#dc2626">+</strong> Blessé</span>
     <span>🤝 Raison personnelle</span>
     <span>🙅 Hors groupe</span>
     <span>⚪ Autre</span>
@@ -241,7 +245,7 @@
 
   var REASON_ICON = {
     suspendu: '🟥',
-    blessure: '➕',
+    blessure: '+',
     personnel: '🤝',
     hors_groupe: '🙅',
     autre: '⚪'
@@ -333,7 +337,8 @@
         row.appendChild(el('span', { class: 'player-poste', text: j.posteFin || '' }));
         row.appendChild(el('span', { class: 'player-name', text: j.prenom + ' ' + j.nom }));
         row.appendChild(el('span', { class: 'player-raison', text: j.raison }));
-        row.appendChild(el('span', { class: 'player-icon', title: REASON_LABEL[categorie], text: REASON_ICON[categorie] }));
+        var iconClass = 'player-icon' + (categorie === 'blessure' ? ' icon-blessure' : '');
+        row.appendChild(el('span', { class: iconClass, title: REASON_LABEL[categorie], text: REASON_ICON[categorie] }));
         card.appendChild(row);
       });
       teamGrid.appendChild(card);
