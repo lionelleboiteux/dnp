@@ -147,7 +147,7 @@
      long each player's name or reason text is. */
   .player-row {
     display: grid;
-    grid-template-columns: 1.5rem minmax(0, 1.6fr) 3.25rem minmax(0, 1.4fr);
+    grid-template-columns: 3.25rem minmax(0, 1.6fr) minmax(0, 1.4fr) 1.5rem;
     align-items: center;
     gap: 0.5rem;
     padding: 0.4rem 0;
@@ -170,7 +170,7 @@
   }
   .player-raison { color: var(--muted); font-size: 0.82rem; text-align: right; }
   @media (min-width: 640px) {
-    .player-row { grid-template-columns: 1.5rem minmax(0, 1fr) 3.25rem minmax(0, 1fr); }
+    .player-row { grid-template-columns: 3.25rem minmax(0, 1fr) minmax(0, 1fr) 1.5rem; }
   }
   .empty-state, .error-state {
     text-align: center;
@@ -218,7 +218,7 @@
 
   <div class="legend">
     <span>🟥 Suspendu</span>
-    <span>❌ Blessé</span>
+    <span>➕ Blessé</span>
     <span>🤝 Raison personnelle</span>
     <span>🙅 Hors groupe</span>
     <span>⚪ Autre</span>
@@ -241,7 +241,7 @@
 
   var REASON_ICON = {
     suspendu: '🟥',
-    blessure: '❌',
+    blessure: '➕',
     personnel: '🤝',
     hors_groupe: '🙅',
     autre: '⚪'
@@ -330,10 +330,10 @@
       team.joueurs.forEach(function (j) {
         var categorie = REASON_ICON.hasOwnProperty(j.categorie) ? j.categorie : 'autre';
         var row = el('div', { class: 'player-row' });
-        row.appendChild(el('span', { class: 'player-icon', title: REASON_LABEL[categorie], text: REASON_ICON[categorie] }));
-        row.appendChild(el('span', { class: 'player-name', text: j.prenom + ' ' + j.nom }));
         row.appendChild(el('span', { class: 'player-poste', text: j.posteFin || '' }));
+        row.appendChild(el('span', { class: 'player-name', text: j.prenom + ' ' + j.nom }));
         row.appendChild(el('span', { class: 'player-raison', text: j.raison }));
+        row.appendChild(el('span', { class: 'player-icon', title: REASON_LABEL[categorie], text: REASON_ICON[categorie] }));
         card.appendChild(row);
       });
       teamGrid.appendChild(card);
