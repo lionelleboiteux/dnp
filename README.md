@@ -89,11 +89,13 @@ file, append `?api=<url>` to the page's own URL instead.)
 - Any `Bless/Susp` text that doesn't match `HG`/`Susp`/one of the two
   calibrated colors comes back as category `autre` with the raw sheet text
   shown, rather than being dropped silently.
-- Team logos: no verified crest image source is wired up. The frontend
-  currently renders a colored initials badge per team instead of a real
-  logo (see `teamInitials()` in `frontend/index.html`). To use real crests,
-  either supply a `{ "Angers": "https://...", ... }` URL map to swap into
-  the rendering code, or point at an API that returns them.
+- Team logos: sourced from the pronos Supabase `teams` table and hardcoded
+  in `TEAM_LOGOS` in `frontend/index.html`, matched by hand against this
+  sheet's `Equipe` values. Metz and Nantes aren't in that table (it has
+  stale entries for Troyes/Le Mans FC, from before a promotion/relegation
+  cycle) and fall back to the colored initials badge (`teamInitials()`)
+  until a source is found for them; the same fallback also covers any
+  crest URL that 404s at runtime.
 - "Next journée to be played" (the default selection and the top of the
   dropdown) is inferred by `orderedJourneeList_()` in `Code.gs`: it scans
   the `MN` column for each journée and treats the first entirely-blank one

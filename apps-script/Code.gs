@@ -14,13 +14,15 @@
  *   ?journee=Journée 12 -> [{ equipe, joueurs: [{nom, prenom, posteFin, raison, categorie}] }]
  */
 
-// TODO: run debugColors() once from the Apps Script editor (select it in the
-// function dropdown, click Run, then View > Executions to read the logged
-// hex values for a known injured/personal/suspended cell) and update these
-// three constants to match what the sheet actually uses.
-var COLOR_INJURED = '#f4cccc';   // pink
-var COLOR_PERSONAL = '#d9ead3';  // green
-var COLOR_SUSPENDED = '#ea9999'; // red
+// Confirmed against the live sheet via debugColors(): "Susp" cells are pure
+// red. INJURED is a guess pending confirmation (seen once on "En reprise",
+// which is recovery-adjacent rather than a clean injury sample) — TODO:
+// re-check against a body-part injury cell (e.g. "Musculaire"). PERSONAL is
+// still unconfirmed — TODO: check the fill color on a "Paternité"/"Personnel"
+// cell and update below.
+var COLOR_INJURED = '#ff00ff';   // TODO confirm (currently from "En reprise")
+var COLOR_PERSONAL = '#d9ead3';  // TODO confirm (unverified placeholder)
+var COLOR_SUSPENDED = '#ff0000'; // confirmed
 
 // TODO: confirm this is the tab at gid=1172236022 in the sheet URL.
 var SHEET_NAME = 'Liste Joueur 25-26';

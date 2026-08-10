@@ -272,9 +272,31 @@
     statusLine.textContent = text || '';
   }
 
-  // No verified team-crest image source is wired up yet (see README) — a
-  // colored initials badge stands in for the logo until real crest URLs
-  // are supplied, so the layout never depends on an external image 404ing.
+  // Sourced from the pronos Supabase `teams` table (same account/project as
+  // pronos.fantasy-coach.fr), matched by hand against this sheet's actual
+  // Equipe values. Metz and Nantes aren't in that table (it has stale
+  // entries for Troyes/Le Mans FC instead, from before a promotion/
+  // relegation cycle) — those two fall back to the initials badge below
+  // until a source for them is supplied.
+  var TEAM_LOGOS = {
+    'Angers': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_4_37_512x512_b5149d8c4312c158b2975298205510eb.png',
+    'Auxerre': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_4_2_512x512_4bed22ddd777a8b0977284bee7f416a7.png',
+    'Brest': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_44_512x512_b8930455bc938de7b9f4e128e1036989.png',
+    'Le Havre': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_5_512x512_e9bf970697e022dcbd3d51e245f3682d.png',
+    'Lens': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2026_1_6_512x512_d08b45acce8a87d13b938cde8974362f.png',
+    'Lille': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_158_512x512_39a605746d9cf4eb12d9cd4f63adb27c.png',
+    'Lorient': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_7_512x512_7d0c497c5f41d0dcf5dabad2910699e3.png',
+    'Lyon': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_159_512x512_1a9c2cd8f58fba433bb5cd568b3de7d0.png',
+    'Marseille': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2025_1_1_512x512_16ca4f08072a6b6d99169ba2b6a8b228.png',
+    'Monaco': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_9_512x512_ad7dd146950eee8eb68ea9588a674fe8.png',
+    'Nice': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_30_512x512_2ccb89a2f1fbad23e693d1c5d101a25d.png',
+    'Paris FC': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_4_90_512x512_8b2bb52cf67eb9456c794509c7e58c46.png',
+    'Paris SG': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_13_512x512_4a9438034a011c1368c52d097a93b98f.png',
+    'Rennes': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_14_512x512_28c7492293ca34c6e26d6cb71e858a57.png',
+    'Strasbourg': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_15_512x512_e9553990e86d8098a3cf94febe8b4b96.png',
+    'Toulouse': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_16_512x512_a7be4e575396227614acc0ed47083503.png'
+  };
+
   function teamInitials(equipe) {
     return String(equipe || '?')
       .split(/\s+/)
@@ -293,7 +315,16 @@
     teams.forEach(function (team) {
       var card = el('div', { class: 'team-card' });
       var heading = el('h2', {});
-      heading.appendChild(el('span', { class: 'team-logo-fallback', text: teamInitials(team.equipe) }));
+      var logoUrl = TEAM_LOGOS[team.equipe];
+      if (logoUrl) {
+        var logo = el('img', { class: 'team-logo', src: logoUrl, alt: team.equipe });
+        logo.addEventListener('error', function () {
+          this.replaceWith(el('span', { class: 'team-logo-fallback', text: teamInitials(team.equipe) }));
+        });
+        heading.appendChild(logo);
+      } else {
+        heading.appendChild(el('span', { class: 'team-logo-fallback', text: teamInitials(team.equipe) }));
+      }
       heading.appendChild(el('span', { text: team.equipe }));
       card.appendChild(heading);
       team.joueurs.forEach(function (j) {
