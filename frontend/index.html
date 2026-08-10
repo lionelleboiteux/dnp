@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Joueurs Indisponibles Ligue 1 par Journée | Fantasy Coach</title>
+<meta name="description" content="Retrouvez, journée par journée, la liste des joueurs de Ligue 1 indisponibles (blessure, suspension, raison personnelle, hors groupe) pour chaque équipe.">
+<link rel="canonical" href="https://l1.dnp.fantasy-coach.fr/">
+<meta name="robots" content="index, follow">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Fantasy Coach">
+<meta property="og:title" content="Joueurs Indisponibles Ligue 1 par Journée | Fantasy Coach">
+<meta property="og:description" content="La liste des joueurs indisponibles (blessure, suspension, raison personnelle, hors groupe) pour chaque équipe de Ligue 1, journée par journée.">
+<meta property="og:url" content="https://l1.dnp.fantasy-coach.fr/">
+<meta property="og:image" content="https://static.wixstatic.com/media/449182_b075115d95e54908bebcaaef43561929~mv2.png/v1/fill/w_174,h_174,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/newlogo.png">
+<style>
+  :root {
+    /* fantasy-coach.fr's own blue (reused from pronos.fantasy-coach.fr) so
+       this page reads as part of the same site, not a separate app. */
+    --fc-blue: #3d9be9;
+    --fc-blue-light: #63b0ee;
+    --bg: #ffffff;
+    --card: #ffffff;
+    --ink: #1c1917;
+    --muted: #6b6560;
+    --border: #d6d3d1;
+    --accent: var(--fc-blue);
+    --accent-ink: #ffffff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 0 1rem 1rem;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.5;
+  }
+  .site-banner {
+    background: linear-gradient(180deg, var(--fc-blue-light) 0%, var(--fc-blue) 100%);
+    color: #ffffff;
+    margin: 0 -1rem 1.5rem;
+    padding: 1.25rem 1rem 0;
+  }
+  .site-banner-top {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    text-align: center;
+  }
+  .site-logo { width: 56px; height: 56px; border-radius: 50%; }
+  .site-title { display: block; font-size: 1.5rem; font-weight: 800; color: #ffffff; text-decoration: none; }
+  .site-tagline { margin: 0.1rem 0 0; font-size: 0.82rem; opacity: 0.9; }
+  .site-nav {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.25rem 1rem;
+    margin-top: 1rem;
+    padding: 0.6rem 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.3);
+    font-size: 0.85rem;
+  }
+  .site-nav a { color: #ffffff; text-decoration: none; font-weight: 600; }
+  .site-footer { text-align: center; font-size: 0.8rem; color: var(--muted); margin: 2.5rem 0 1rem; }
+  main { max-width: 960px; margin: 0 auto; }
+  h1 { font-size: 1.4rem; margin: 0.5rem 0 1rem; }
+  .intro { margin-bottom: 1.25rem; }
+  .intro p { margin: 0.5rem 0; }
+  .journee-picker { margin-bottom: 1.5rem; }
+  .journee-picker label { display: block; font-weight: 600; margin-bottom: 0.4rem; }
+  .journee-picker select {
+    width: 100%;
+    max-width: 320px;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--ink);
+    font-size: 1rem;
+  }
+  .status-line { color: var(--muted); font-size: 0.9rem; margin: 0.5rem 0 1rem; }
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1rem;
+    font-size: 0.82rem;
+    color: var(--muted);
+    margin-bottom: 1.25rem;
+  }
+  .team-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  @media (min-width: 640px) {
+    .team-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (min-width: 960px) {
+    .team-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+  .team-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.9rem 1rem 1rem;
+  }
+  .team-card h2 {
+    font-size: 1rem;
+    margin: 0 0 0.6rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--accent);
+  }
+  .player-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.35rem 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.9rem;
+  }
+  .player-row:last-child { border-bottom: none; }
+  .player-icon { flex: none; font-size: 1rem; }
+  .player-name { font-weight: 600; }
+  .player-poste { color: var(--muted); font-size: 0.8rem; }
+  .player-raison { margin-left: auto; color: var(--muted); font-size: 0.82rem; text-align: right; }
+  .empty-state, .error-state {
+    text-align: center;
+    color: var(--muted);
+    padding: 2rem 1rem;
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+  }
+  .error-state { color: #b91c1c; }
+</style>
+</head>
+<body>
+<header class="site-banner">
+  <div class="site-banner-top">
+    <a href="https://www.fantasy-coach.fr/">
+      <img class="site-logo" src="https://static.wixstatic.com/media/449182_b075115d95e54908bebcaaef43561929~mv2.png/v1/fill/w_174,h_174,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/newlogo.png" alt="logo fantasy coach">
+    </a>
+    <div>
+      <a class="site-title" href="https://www.fantasy-coach.fr/">Fantasy Coach</a>
+      <p class="site-tagline">La référence Fantasy Foot</p>
+    </div>
+  </div>
+  <nav class="site-nav">
+    <a href="https://www.fantasy-coach.fr/ligue1">Ligue 1</a>
+    <a href="https://www.fantasy-coach.fr/fantasy-l1">Fantasy L1</a>
+    <a href="https://www.fantasy-coach.fr/sorare">Sorare</a>
+    <a href="https://www.fantasy-coach.fr/fpl">FPL</a>
+    <a href="https://www.fantasy-coach.fr/bundesliga">Bundesliga</a>
+    <a href="https://pronos.fantasy-coach.fr/">Pronos</a>
+  </nav>
+</header>
+
+<main id="app">
+  <h1>Joueurs indisponibles — Ligue 1</h1>
+  <div class="intro">
+    <p>Choisissez une journée pour voir, équipe par équipe, les joueurs indisponibles et pourquoi (blessure, suspension, raison personnelle, ou hors groupe).</p>
+  </div>
+
+  <div class="journee-picker">
+    <label for="journee-select">Journée</label>
+    <select id="journee-select" disabled>
+      <option>Chargement…</option>
+    </select>
+  </div>
+
+  <div class="legend">
+    <span>🟥 Suspendu</span>
+    <span>❌ Blessé</span>
+    <span>🤝 Raison personnelle</span>
+    <span>🙅 Hors groupe</span>
+    <span>⚪ Autre</span>
+  </div>
+
+  <p id="status-line" class="status-line"></p>
+  <div id="team-grid" class="team-grid"></div>
+  <noscript><p>Activez JavaScript pour afficher les joueurs indisponibles.</p></noscript>
+</main>
+
+<footer class="site-footer">&copy;2026 by Fantasy Coach.</footer>
+
+<script>
+(function () {
+  // ?api=<url> overrides the default for local/dev testing only; never
+  // persisted, so production use is unaffected. Same convention as
+  // pronos.fantasy-coach.fr's frontend.
+  var API_BASE = new URLSearchParams(location.search).get('api') ||
+    'https://script.google.com/macros/s/AKfycbwG3lKRNPpxfL7jjjhcr9iG59D8UIAMpT08WHTNR8mG3-T4AC3U20MdKD-0wzliBEex/exec';
+
+  var REASON_ICON = {
+    suspendu: '🟥',
+    blessure: '❌',
+    personnel: '🤝',
+    hors_groupe: '🙅',
+    autre: '⚪'
+  };
+  var REASON_LABEL = {
+    suspendu: 'Suspendu',
+    blessure: 'Blessé',
+    personnel: 'Raison personnelle',
+    hors_groupe: 'Hors groupe',
+    autre: 'Autre'
+  };
+
+  var select = document.getElementById('journee-select');
+  var statusLine = document.getElementById('status-line');
+  var teamGrid = document.getElementById('team-grid');
+
+  function el(tag, attrs, children) {
+    var e = document.createElement(tag);
+    for (var k in (attrs || {})) {
+      if (k === 'text') e.textContent = attrs[k];
+      else e.setAttribute(k, attrs[k]);
+    }
+    (children || []).forEach(function (c) { e.appendChild(c); });
+    return e;
+  }
+
+  function setStatus(text) {
+    statusLine.textContent = text || '';
+  }
+
+  function renderTeams(teams) {
+    teamGrid.innerHTML = '';
+    if (!teams || teams.length === 0) {
+      teamGrid.appendChild(el('div', { class: 'empty-state', text: 'Aucun joueur indisponible pour cette journée.' }));
+      return;
+    }
+    teams.forEach(function (team) {
+      var card = el('div', { class: 'team-card' });
+      card.appendChild(el('h2', { text: team.equipe }));
+      team.joueurs.forEach(function (j) {
+        var categorie = REASON_ICON.hasOwnProperty(j.categorie) ? j.categorie : 'autre';
+        var row = el('div', { class: 'player-row' });
+        row.appendChild(el('span', { class: 'player-icon', title: REASON_LABEL[categorie], text: REASON_ICON[categorie] }));
+        row.appendChild(el('span', { class: 'player-name', text: j.prenom + ' ' + j.nom }));
+        row.appendChild(el('span', { class: 'player-poste', text: j.posteFin || '' }));
+        row.appendChild(el('span', { class: 'player-raison', text: j.raison }));
+        card.appendChild(row);
+      });
+      teamGrid.appendChild(card);
+    });
+  }
+
+  function loadJournee(journee) {
+    setStatus('Chargement…');
+    teamGrid.innerHTML = '';
+    fetch(API_BASE + '?journee=' + encodeURIComponent(journee))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data && data.error) throw new Error(data.error);
+        setStatus('');
+        renderTeams(data);
+      })
+      .catch(function (err) {
+        setStatus('');
+        teamGrid.appendChild(el('div', { class: 'error-state', text: 'Impossible de charger les données (' + err.message + ').' }));
+      });
+  }
+
+  fetch(API_BASE + '?meta=1')
+    .then(function (r) { return r.json(); })
+    .then(function (journees) {
+      select.innerHTML = '';
+      journees.forEach(function (j) {
+        select.appendChild(el('option', { value: j, text: j }));
+      });
+      select.disabled = false;
+      select.addEventListener('change', function () { loadJournee(select.value); });
+      if (journees.length) loadJournee(journees[journees.length - 1]);
+    })
+    .catch(function (err) {
+      select.innerHTML = '';
+      select.appendChild(el('option', { text: 'Erreur de chargement' }));
+      teamGrid.appendChild(el('div', { class: 'error-state', text: 'Impossible de charger la liste des journées (' + err.message + ').' }));
+    });
+})();
+</script>
+</body>
+</html>
