@@ -23,6 +23,33 @@
   "inLanguage": "fr"
 }
 </script>
+<!--
+  Google Funding Choices (GDPR consent for EU visitors) — must load before
+  the AdSense script below so ads only fire once consent is resolved. Same
+  pub-6481777982811975 as pronos.fantasy-coach.fr; the banner itself only
+  appears once a "Privacy & messaging" GDPR message is published in that
+  AdSense account, this script is the standard Google-published loader.
+-->
+<script async src="https://fundingchoicesmessages.google.com/i/pub-6481777982811975?ers=1"></script>
+<script>
+  (function () {
+    function signalGooglefcPresent() {
+      if (!window.frames['googlefcPresent']) {
+        if (document.body) {
+          var iframe = document.createElement('iframe');
+          iframe.style.cssText = 'width: 0; height: 0; border: none; z-index: -1000; left: -1000px; top: -1000px;';
+          iframe.style.display = 'none';
+          iframe.name = 'googlefcPresent';
+          document.body.appendChild(iframe);
+        } else {
+          setTimeout(signalGooglefcPresent, 0);
+        }
+      }
+    }
+    signalGooglefcPresent();
+  })();
+</script>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6481777982811975" crossorigin="anonymous"></script>
 <style>
   :root {
     /* fantasy-coach.fr's own blue (reused from pronos.fantasy-coach.fr) so
