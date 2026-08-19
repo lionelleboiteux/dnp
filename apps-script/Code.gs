@@ -114,8 +114,8 @@ function orderedJourneeList_(sheet, journeeMap) {
     var blessOffset = journeeMap[labels[li]].blessSusp - firstMnCol;
     var played = false;
     for (var r = 0; r < numRows; r++) {
-      var v = block[r][blessOffset];
-      if (v !== '' && v !== null) {
+      var v = String(block[r][blessOffset] || '').trim();
+      if (v !== '') {
         played = true;
         break;
       }
