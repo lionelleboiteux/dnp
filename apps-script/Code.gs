@@ -86,10 +86,12 @@ function buildJourneeColumnMap_(sheet) {
 /**
  * Object key order for buildJourneeColumnMap_'s map is insertion order,
  * i.e. chronological (left-to-right in the sheet). A journée counts as
- * "played" when its MN column has at least one non-blank cell — future
- * journées are entirely blank until that week's data is entered. Played
- * journées are assumed to form a contiguous prefix of the season (weeks
- * are filled in order), so this walks forward and stops at the first gap.
+ * "played" when its Bless/Susp column has at least one non-blank cell —
+ * future journées are entirely blank there until that week's data is
+ * entered (MN is filled in ahead of time and so isn't a reliable signal).
+ * Played journées are assumed to form a contiguous prefix of the season
+ * (weeks are filled in order), so this walks forward and stops at the
+ * first gap.
  *
  * Returned order: next journée to be played first, then already-played
  * journées most-recent-first, then any further-future journées in their
@@ -109,10 +111,10 @@ function orderedJourneeList_(sheet, journeeMap) {
 
   var lastPlayedIdx = -1;
   for (var li = 0; li < labels.length; li++) {
-    var mnOffset = journeeMap[labels[li]].mn - firstMnCol;
+    var blessOffset = journeeMap[labels[li]].blessSusp - firstMnCol;
     var played = false;
     for (var r = 0; r < numRows; r++) {
-      var v = block[r][mnOffset];
+      var v = block[r][blessOffset];
       if (v !== '' && v !== null) {
         played = true;
         break;
