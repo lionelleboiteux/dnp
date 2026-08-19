@@ -9,8 +9,9 @@
  *
  * Endpoints (all GET, no auth):
  *   ?meta=1            -> ["Journée 12", "Journée 11", ..., "Journée 1", "Journée 13", ...]
- *                         (next journée to be played first, then already-played
- *                         journées most-recent-first, then further-future ones)
+ *                         (current journée first — the last one with Bless/Susp
+ *                         data — then earlier journées most-recent-first, then
+ *                         future journées in order)
  *   ?journee=Journée 12 -> [{ equipe, joueurs: [{nom, prenom, posteFin, raison, categorie}] }]
  */
 
@@ -93,9 +94,9 @@ function buildJourneeColumnMap_(sheet) {
  * (weeks are filled in order), so this walks forward and stops at the
  * first gap.
  *
- * Returned order: next journée to be played first, then already-played
- * journées most-recent-first, then any further-future journées in their
- * normal order.
+ * Returned order: the current journée first (the last one with data —
+ * lastPlayedIdx), then earlier played journées most-recent-first, then
+ * any future journées in their normal order.
  */
 function orderedJourneeList_(sheet, journeeMap) {
   var labels = Object.keys(journeeMap);
@@ -125,14 +126,9 @@ function orderedJourneeList_(sheet, journeeMap) {
   }
 
   var nextIdx = lastPlayedIdx + 1;
-  if (nextIdx >= labels.length) {
-    // Whole season already has data — just show most recent first.
-    return labels.slice().reverse();
-  }
-
-  var upcoming = labels.slice(nextIdx); // [nextToPlay, ...further future]
-  var playedDesc = labels.slice(0, nextIdx).reverse(); // most recently played first
-  return [upcoming[0]].concat(playedDesc, upcoming.slice(1));
+  var playedDesc = labels.slice(0, nextIdx).reverse(); // current journée first, then most recent first
+  var upcoming = labels.slice(nextIdx); // future journées, chronological
+  return playedDesc.concat(upcoming);
 }
 
 function readUnavailablePlayers_(sheet, cols) {
