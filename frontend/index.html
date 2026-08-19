@@ -389,19 +389,41 @@
       });
   }
 
-  fetch(API_BASE + '?meta=1')
-    .then(function (r) { return r.json(); })
-    .then(function (journees) {
+  // jeu-des-pronos already tracks which Ligue 1 gameweek is current (locks
+  // open/close around kickoffs); reuse that instead of guessing from
+  // Bless/Susp data, which can be filled in far ahead of the actual week.
+  var PRONOS_API_BASE = 'https://dmytkubjxwwwkroutvdu.supabase.co/functions/v1/api';
+  var PRONOS_L1_LEAGUE_ID = '27f27a15-02a9-448a-98d5-80998e2fa52e';
+
+  function fetchCurrentGameweekNumber() {
+    return fetch(PRONOS_API_BASE + '/v1/leagues/' + PRONOS_L1_LEAGUE_ID + '/current')
+      .then(function (r) { return r.json(); })
+      .then(function (data) { return data && data.gameweek ? data.gameweek.number : null; })
+      .catch(function () { return null; });
+  }
+
+  Promise.all([
+    fetch(API_BASE + '?meta=1').then(function (r) { return r.json(); }),
+    fetchCurrentGameweekNumber()
+  ])
+    .then(function (results) {
+      var journees = results[0];
+      var currentNumber = results[1];
       select.innerHTML = '';
       journees.forEach(function (j) {
         select.appendChild(el('option', { value: j, text: j }));
       });
       select.disabled = false;
       select.addEventListener('change', function () { loadJournee(select.value); });
-      // Backend orders this list with the next journée to be played first
-      // (see Code.gs orderedJourneeList_), so the first option is the
-      // sensible default to show on load.
-      if (journees.length) loadJournee(journees[0]);
+
+      var defaultJournee = currentNumber != null ? 'Journée ' + currentNumber : null;
+      if (!defaultJournee || journees.indexOf(defaultJournee) === -1) {
+        defaultJournee = journees.length ? journees[0] : null;
+      }
+      if (defaultJournee) {
+        select.value = defaultJournee;
+        loadJournee(defaultJournee);
+      }
     })
     .catch(function (err) {
       select.innerHTML = '';

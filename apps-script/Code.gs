@@ -8,10 +8,9 @@
  * published. Only the fields returned below ever leave the sheet.
  *
  * Endpoints (all GET, no auth):
- *   ?meta=1            -> ["Journée 12", "Journée 11", ..., "Journée 1", "Journée 13", ...]
- *                         (current journée first — the last one with Bless/Susp
- *                         data — then earlier journées most-recent-first, then
- *                         future journées in order)
+ *   ?meta=1            -> ["Journée 1", "Journée 2", ..., "Journée 34"] (chronological;
+ *                         the frontend decides which one is "current" via the
+ *                         jeu-des-pronos API, not this list's order)
  *   ?journee=Journée 12 -> [{ equipe, joueurs: [{nom, prenom, posteFin, raison, categorie}] }]
  */
 
@@ -39,7 +38,9 @@ function doGet(e) {
 
   var journee = e.parameter.journee;
   if (!journee) {
-    return jsonResponse_(orderedJourneeList_(sheet, journeeMap));
+    // Object key order is insertion order, i.e. chronological (left-to-right
+    // in the sheet) — see buildJourneeColumnMap_.
+    return jsonResponse_(Object.keys(journeeMap));
   }
 
   var cols = journeeMap[journee];
@@ -82,53 +83,6 @@ function buildJourneeColumnMap_(sheet) {
     }
   }
   return map;
-}
-
-/**
- * Object key order for buildJourneeColumnMap_'s map is insertion order,
- * i.e. chronological (left-to-right in the sheet). A journée counts as
- * "played" when its Bless/Susp column has at least one non-blank cell —
- * future journées are entirely blank there until that week's data is
- * entered (MN is filled in ahead of time and so isn't a reliable signal).
- * Played journées are assumed to form a contiguous prefix of the season
- * (weeks are filled in order), so this walks forward and stops at the
- * first gap.
- *
- * Returned order: the current journée first (the last one with data —
- * lastPlayedIdx), then earlier played journées most-recent-first, then
- * any future journées in their normal order.
- */
-function orderedJourneeList_(sheet, journeeMap) {
-  var labels = Object.keys(journeeMap);
-  if (labels.length === 0) return labels;
-
-  var lastRow = sheet.getLastRow();
-  var numRows = lastRow - FIRST_DATA_ROW + 1;
-  if (numRows <= 0) return labels;
-
-  var firstMnCol = journeeMap[labels[0]].mn;
-  var lastBlessCol = journeeMap[labels[labels.length - 1]].blessSusp;
-  var block = sheet.getRange(FIRST_DATA_ROW, firstMnCol, numRows, lastBlessCol - firstMnCol + 1).getValues();
-
-  var lastPlayedIdx = -1;
-  for (var li = 0; li < labels.length; li++) {
-    var blessOffset = journeeMap[labels[li]].blessSusp - firstMnCol;
-    var played = false;
-    for (var r = 0; r < numRows; r++) {
-      var v = String(block[r][blessOffset] || '').trim();
-      if (v !== '') {
-        played = true;
-        break;
-      }
-    }
-    if (played) lastPlayedIdx = li;
-    else break;
-  }
-
-  var nextIdx = lastPlayedIdx + 1;
-  var playedDesc = labels.slice(0, nextIdx).reverse(); // current journée first, then most recent first
-  var upcoming = labels.slice(nextIdx); // future journées, chronological
-  return playedDesc.concat(upcoming);
 }
 
 function readUnavailablePlayers_(sheet, cols) {
