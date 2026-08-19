@@ -12,6 +12,12 @@
  *                         the frontend decides which one is "current" via the
  *                         jeu-des-pronos API, not this list's order)
  *   ?journee=Journée 12 -> [{ equipe, joueurs: [{nom, prenom, posteFin, raison, categorie}] }]
+ *
+ * Responses are cached in CacheService (script-wide, up to 6h) so repeat
+ * requests skip the SpreadsheetApp reads entirely. The cache is invalidated
+ * by bumping a version stamp in PropertiesService whenever the sheet is
+ * edited (see onEdit below) — that changes every cache key at once, so
+ * stale entries just age out rather than needing to be deleted.
  */
 
 // Confirmed against the live sheet (debugColors() for red, manual cell
@@ -32,23 +38,61 @@ var COL_POSTE_FIN = 6;
 // Data rows start after the two header rows (main label row + Carton/MN/Bless-Susp sub-header row).
 var FIRST_DATA_ROW = 3;
 
+// CacheService's own cap; also used as a safety-net TTL in case an edit
+// somehow doesn't trigger onEdit below.
+var CACHE_TTL_SECONDS = 21600;
+
 function doGet(e) {
+  var journee = e.parameter.journee;
+  var cacheKey = journee ? 'journee:' + journee : 'meta';
+
+  var cached = cacheGet_(cacheKey);
+  if (cached !== null) {
+    return jsonResponseRaw_(cached);
+  }
+
   var sheet = SpreadsheetApp.getActive().getSheetByName(SHEET_NAME);
   var journeeMap = buildJourneeColumnMap_(sheet);
 
-  var journee = e.parameter.journee;
+  var payload;
   if (!journee) {
     // Object key order is insertion order, i.e. chronological (left-to-right
     // in the sheet) — see buildJourneeColumnMap_.
-    return jsonResponse_(Object.keys(journeeMap));
+    payload = Object.keys(journeeMap);
+  } else {
+    var cols = journeeMap[journee];
+    if (!cols) {
+      return jsonResponse_({ error: 'Journée inconnue: ' + journee });
+    }
+    payload = readUnavailablePlayers_(sheet, cols);
   }
 
-  var cols = journeeMap[journee];
-  if (!cols) {
-    return jsonResponse_({ error: 'Journée inconnue: ' + journee });
-  }
+  var json = JSON.stringify(payload);
+  cacheSet_(cacheKey, json);
+  return jsonResponseRaw_(json);
+}
 
-  return jsonResponse_(readUnavailablePlayers_(sheet, cols));
+/**
+ * Simple trigger — fires automatically on any edit to the bound sheet, no
+ * installable-trigger setup needed. Bumping the version stamp changes every
+ * cache key derived from it, which invalidates the whole cache in one write
+ * without needing to know which keys currently exist.
+ */
+function onEdit(e) {
+  PropertiesService.getScriptProperties().setProperty('cacheVersion', String(Date.now()));
+}
+
+function getCacheVersion_() {
+  var v = PropertiesService.getScriptProperties().getProperty('cacheVersion');
+  return v || '0';
+}
+
+function cacheGet_(key) {
+  return CacheService.getScriptCache().get('v' + getCacheVersion_() + ':' + key);
+}
+
+function cacheSet_(key, value) {
+  CacheService.getScriptCache().put('v' + getCacheVersion_() + ':' + key, value, CACHE_TTL_SECONDS);
 }
 
 /**
@@ -134,7 +178,11 @@ function sameColor_(a, b) {
 }
 
 function jsonResponse_(payload) {
-  return ContentService.createTextOutput(JSON.stringify(payload))
+  return jsonResponseRaw_(JSON.stringify(payload));
+}
+
+function jsonResponseRaw_(json) {
+  return ContentService.createTextOutput(json)
     .setMimeType(ContentService.MimeType.JSON);
 }
 
