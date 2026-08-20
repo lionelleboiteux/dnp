@@ -1,7 +1,7 @@
 /**
  * DNP — L1 unavailable players API.
  *
- * Bound to the Google Sheet "Stats joueur L1 - Saison 25-26". Deployed as a
+ * Bound to the Google Sheet "Stats joueur L1 - Saison 26-27". Deployed as a
  * Web App (Deploy > New deployment > Web app), "Execute as: Me",
  * "Who has access: Anyone" — this lets an anonymous visitor's browser read
  * data derived from the sheet without the sheet itself being shared or
@@ -26,8 +26,7 @@ var COLOR_INJURED = '#ff00ff';
 var COLOR_PERSONAL = '#42ff40';
 var COLOR_SUSPENDED = '#ff0000';
 
-// TODO: confirm this is the tab at gid=1172236022 in the sheet URL.
-var SHEET_NAME = 'Liste Joueur 25-26';
+var SHEET_NAME = 'Liste Joueur 26-27';
 
 // Identity columns, 1-indexed, matching the sheet's fixed left-hand columns.
 var COL_NOM = 2;

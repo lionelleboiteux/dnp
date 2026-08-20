@@ -29,7 +29,7 @@ frontend/index.html (static, GitHub Pages, l1.dnp.fantasy-coach.fr)
 
 ### 1. Attach and deploy the Apps Script
 
-1. Open the "Stats joueur L1 - Saison 25-26" Google Sheet with an account
+1. Open the "Stats joueur L1 - Saison 26-27" Google Sheet with an account
    that has **edit** access.
 2. Extensions > Apps Script. Delete the default `Code.gs` content and paste
    in the contents of [`apps-script/Code.gs`](apps-script/Code.gs). Add a
@@ -54,8 +54,10 @@ frontend/index.html (static, GitHub Pages, l1.dnp.fantasy-coach.fr)
    `COLOR_INJURED`, `COLOR_PERSONAL`, `COLOR_SUSPENDED` at the top of
    `Code.gs` to match, then save.
 4. Also confirm `SHEET_NAME` in `Code.gs` matches the actual tab name (it's
-   currently set to `'Liste Joueur 25-26'`, inspected from the sheet at
-   https://docs.google.com/spreadsheets/d/1JfTnLwCGDs56xgZdAewkwjHD8Se7yjfDogw1CH1Q_7k/edit?gid=1172236022).
+   currently set to `'Liste Joueur 26-27'` — this has already drifted once
+   this season when the tab was renamed from `'Liste Joueur 25-26'`, which
+   broke the live site until `SHEET_NAME` was updated to match; re-check
+   this any time the sheet stops responding).
 5. Deploy > New deployment > type **Web app**. "Execute as: **Me**",
    "Who has access: **Anyone**". Deploy and copy the Web App URL
    (`https://script.google.com/macros/s/.../exec`).
