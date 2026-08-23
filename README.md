@@ -93,11 +93,13 @@ file, append `?api=<url>` to the page's own URL instead.)
   shown, rather than being dropped silently.
 - Team logos: sourced from the pronos Supabase `teams` table and hardcoded
   in `TEAM_LOGOS` in `frontend/index.html`, matched by hand against this
-  sheet's `Equipe` values. Metz and Nantes aren't in that table (it has
-  stale entries for Troyes/Le Mans FC, from before a promotion/relegation
-  cycle) and fall back to the colored initials badge (`teamInitials()`)
-  until a source is found for them; the same fallback also covers any
-  crest URL that 404s at runtime.
+  sheet's `Equipe` values. Troyes and Le Mans are this season's promoted
+  clubs (confirmed directly against live pronos game data), replacing
+  Metz/Nantes from the roster this map was originally built against. Any
+  team name that doesn't match a key, including a future promotion/
+  relegation cycle not yet reflected here, falls back to the colored
+  initials badge (`teamInitials()`) — same fallback also covers any crest
+  URL that 404s at runtime.
 - "Next journée to be played" (the default selection and the top of the
   dropdown) is inferred by `orderedJourneeList_()` in `Code.gs`: it scans
   the `MN` column for each journée and treats the first entirely-blank one
