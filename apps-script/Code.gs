@@ -166,10 +166,11 @@ function readUnavailablePlayers_(sheet, cols) {
 
 function classify_(text, bgColor) {
   if (text === 'HG') return 'hors_groupe';
+  if (text === 'Transfert') return 'transfert';
   if (text === 'Susp' || sameColor_(bgColor, COLOR_SUSPENDED)) return 'suspendu';
   if (sameColor_(bgColor, COLOR_INJURED)) return 'blessure';
   if (sameColor_(bgColor, COLOR_PERSONAL)) return 'personnel';
-  return 'autre';
+  return 'incertain';
 }
 
 function sameColor_(a, b) {

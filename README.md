@@ -2,7 +2,7 @@
 
 A page, separate from the Wix-hosted fantasy-coach.fr, showing — for a
 selected journée — which Ligue 1 players are unavailable and why (blessure,
-suspension, raison personnelle, hors groupe), one card per team. Data comes
+suspension, raison personnelle, hors groupe, transfert), one card per team. Data comes
 from a private Google Sheet maintained by a teammate; the sheet itself is
 never published or made public.
 
@@ -89,7 +89,7 @@ file, append `?api=<url>` to the page's own URL instead.)
   frontend, since it's expected to change rarely once the color calibration
   is done.
 - Any `Bless/Susp` text that doesn't match `HG`/`Susp`/one of the two
-  calibrated colors comes back as category `autre` with the raw sheet text
+  calibrated colors comes back as category `incertain` with the raw sheet text
   shown, rather than being dropped silently.
 - Team logos: sourced from the pronos Supabase `teams` table and hardcoded
   in `TEAM_LOGOS` in `frontend/index.html`, matched by hand against this

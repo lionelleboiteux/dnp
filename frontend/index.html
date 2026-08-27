@@ -253,7 +253,8 @@
     <span><strong style="color:#dc2626">+</strong> Blessé</span>
     <span>🤝 Raison personnelle</span>
     <span>🙅 Hors groupe</span>
-    <span>⚪ Autre</span>
+    <span>✈️ Transfert</span>
+    <span>❓ Incertain</span>
   </div>
 
   <p id="status-line" class="status-line"></p>
@@ -276,14 +277,16 @@
     blessure: '+',
     personnel: '🤝',
     hors_groupe: '🙅',
-    autre: '⚪'
+    transfert: '✈️',
+    incertain: '❓'
   };
   var REASON_LABEL = {
     suspendu: 'Suspendu',
     blessure: 'Blessé',
     personnel: 'Raison personnelle',
     hors_groupe: 'Hors groupe',
-    autre: 'Autre'
+    transfert: 'Transfert',
+    incertain: 'Incertain'
   };
 
   var select = document.getElementById('journee-select');
@@ -365,7 +368,7 @@
       heading.appendChild(el('span', { text: team.equipe }));
       card.appendChild(heading);
       team.joueurs.forEach(function (j) {
-        var categorie = REASON_ICON.hasOwnProperty(j.categorie) ? j.categorie : 'autre';
+        var categorie = REASON_ICON.hasOwnProperty(j.categorie) ? j.categorie : 'incertain';
         var row = el('div', { class: 'player-row' });
         row.appendChild(el('span', { class: 'player-poste', text: j.posteFin || '' }));
         row.appendChild(el('span', { class: 'player-name', text: j.prenom + ' ' + j.nom }));
