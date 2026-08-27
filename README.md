@@ -20,7 +20,7 @@ Google Sheet (private)
       v
 Apps Script Web App (apps-script/Code.gs)   <-- runs as the sheet owner/editor,
       |                                          reads text + cell colors
-      | JSON (only nom/prenom/posteFin/raison/categorie — never the raw sheet)
+      | JSON (only nom/prenom/posteFin/raison/categorie/retourPrevu — never the raw sheet)
       v
 frontend/index.html (static, GitHub Pages, l1.dnp.fantasy-coach.fr)
 ```
@@ -84,6 +84,12 @@ file, append `?api=<url>` to the page's own URL instead.)
 
 ## Notes
 
+- Sheet's fixed left-hand identity columns are, 1-indexed: A (unused/checkbox),
+  B `Retour prévu` (free text, per player, not per journée), C `Nom`,
+  D `Prénom`, E `Équipe`, F (unused), G `Poste fin`. These offsets are
+  hardcoded as `COL_*` constants at the top of `Code.gs` — if a column is
+  ever inserted/removed to the left of `Poste fin`, update those constants
+  to match.
 - Whenever Apps Script code changes, redeploy is manual (Deploy > Manage
   deployments > edit > new version) — this isn't wired into CI, unlike the
   frontend, since it's expected to change rarely once the color calibration
@@ -106,3 +112,12 @@ file, append `?api=<url>` to the page's own URL instead.)
   as not yet played, assuming played weeks fill in left-to-right without
   gaps. If the sheet is ever updated out of order this heuristic can be
   wrong for one week until the gap is filled in.
+- Opponent/home-away badges (🏠/✈️ next to each team name) come from the
+  pronos Supabase API's `/v1/leagues/{id}/current` endpoint, fetched
+  alongside the current-gameweek lookup in `frontend/index.html`. That
+  endpoint only ever returns the *live* current gameweek's fixtures — there
+  is no endpoint for an arbitrary journée — so the badges only render when
+  the selected journée matches `currentJourneeLabel`; any other journée
+  shows no badge. Team names are matched via `PRONOS_TEAM_TO_EQUIPE`
+  (pronos's full official names → this sheet's `Equipe` values), the same
+  hand-matching approach as `TEAM_LOGOS`.

@@ -11,7 +11,7 @@
  *   ?meta=1            -> ["Journée 1", "Journée 2", ..., "Journée 34"] (chronological;
  *                         the frontend decides which one is "current" via the
  *                         jeu-des-pronos API, not this list's order)
- *   ?journee=Journée 12 -> [{ equipe, joueurs: [{nom, prenom, posteFin, raison, categorie}] }]
+ *   ?journee=Journée 12 -> [{ equipe, joueurs: [{nom, prenom, posteFin, raison, categorie, retourPrevu}] }]
  *
  * Responses are cached in CacheService (script-wide, up to 6h) so repeat
  * requests skip the SpreadsheetApp reads entirely. The cache is invalidated
@@ -29,10 +29,11 @@ var COLOR_SUSPENDED = '#ff0000';
 var SHEET_NAME = 'Liste Joueur 26-27';
 
 // Identity columns, 1-indexed, matching the sheet's fixed left-hand columns.
-var COL_NOM = 2;
-var COL_PRENOM = 3;
-var COL_EQUIPE = 4;
-var COL_POSTE_FIN = 6;
+var COL_RETOUR_PREVU = 2;
+var COL_NOM = 3;
+var COL_PRENOM = 4;
+var COL_EQUIPE = 5;
+var COL_POSTE_FIN = 7;
 
 // Data rows start after the two header rows (main label row + Carton/MN/Bless-Susp sub-header row).
 var FIRST_DATA_ROW = 3;
@@ -152,7 +153,8 @@ function readUnavailablePlayers_(sheet, cols) {
       prenom: identity[i][COL_PRENOM - 1],
       posteFin: identity[i][COL_POSTE_FIN - 1],
       raison: text,
-      categorie: classify_(text, colors[i][0])
+      categorie: classify_(text, colors[i][0]),
+      retourPrevu: String(identity[i][COL_RETOUR_PREVU - 1] || '').trim()
     };
 
     if (!byTeam[equipe]) byTeam[equipe] = [];

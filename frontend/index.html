@@ -150,6 +150,13 @@
     padding-bottom: 0.5rem;
     border-bottom: 2px solid var(--accent);
   }
+  .team-fixture {
+    margin-left: auto;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--muted);
+    white-space: nowrap;
+  }
   .team-logo {
     flex: none;
     width: 28px;
@@ -175,7 +182,7 @@
      long each player's name or reason text is. */
   .player-row {
     display: grid;
-    grid-template-columns: 3.25rem minmax(0, 1.6fr) minmax(0, 1.4fr) 1.5rem;
+    grid-template-columns: 3.25rem minmax(0, 1.6fr) minmax(0, 1.4fr) 1.5rem minmax(0, 0.9fr);
     align-items: center;
     gap: 0.5rem;
     padding: 0.4rem 0;
@@ -201,8 +208,17 @@
     width: 2.75rem;
   }
   .player-raison { color: var(--muted); font-size: 0.82rem; text-align: right; }
+  .player-retour {
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-style: italic;
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   @media (min-width: 640px) {
-    .player-row { grid-template-columns: 3.25rem minmax(0, 1fr) minmax(0, 1fr) 1.5rem; }
+    .player-row { grid-template-columns: 3.25rem minmax(0, 1fr) minmax(0, 1fr) 1.5rem minmax(0, 0.9fr); }
   }
   .empty-state, .error-state {
     text-align: center;
@@ -337,6 +353,30 @@
     'Le Mans FC': 'https://s3.eu-west-1.amazonaws.com/image.mpg/daabb8d9-230e-4fe2-8214-682fbbdedb5e'
   };
 
+  // Maps pronos Supabase `teams.name` (full official names) to this sheet's
+  // shorter `Equipe` values, same hand-matching as TEAM_LOGOS above. Built
+  // from the L1 rows of the pronos /v1/teams endpoint.
+  var PRONOS_TEAM_TO_EQUIPE = {
+    'AJ Auxerre': 'Auxerre',
+    'Angers SCO': 'Angers',
+    'AS Monaco': 'Monaco',
+    'Estac Troyes': 'Troyes',
+    'FC Lorient': 'Lorient',
+    'Havre Athletic Club': 'Le Havre',
+    'Le Mans FC': 'Le Mans',
+    'LOSC Lille': 'Lille',
+    'OGC Nice': 'Nice',
+    'Olympique de Marseille': 'Marseille',
+    'Olympique Lyonnais': 'Lyon',
+    'Paris FC': 'Paris FC',
+    'Paris Saint-Germain': 'Paris SG',
+    'RC Lens': 'Lens',
+    'RC Strasbourg Alsace': 'Strasbourg',
+    'Stade Brestois 29': 'Brest',
+    'Stade Rennais FC': 'Rennes',
+    'Toulouse FC': 'Toulouse'
+  };
+
   function teamInitials(equipe) {
     return String(equipe || '?')
       .split(/\s+/)
@@ -346,7 +386,7 @@
       .toUpperCase();
   }
 
-  function renderTeams(teams) {
+  function renderTeams(teams, fixturesByEquipe) {
     teamGrid.innerHTML = '';
     if (!teams || teams.length === 0) {
       teamGrid.appendChild(el('div', { class: 'empty-state', text: 'Aucun joueur indisponible pour cette journée.' }));
@@ -366,6 +406,11 @@
         heading.appendChild(el('span', { class: 'team-logo-fallback', text: teamInitials(team.equipe) }));
       }
       heading.appendChild(el('span', { text: team.equipe }));
+      var fixture = fixturesByEquipe && fixturesByEquipe[team.equipe];
+      if (fixture) {
+        var icon = fixture.isHome ? '🏠' : '✈️';
+        heading.appendChild(el('span', { class: 'team-fixture', text: icon + ' vs ' + fixture.opponent }));
+      }
       card.appendChild(heading);
       team.joueurs.forEach(function (j) {
         var categorie = REASON_ICON.hasOwnProperty(j.categorie) ? j.categorie : 'incertain';
@@ -375,21 +420,29 @@
         row.appendChild(el('span', { class: 'player-raison', text: j.raison }));
         var iconClass = 'player-icon' + (categorie === 'blessure' ? ' icon-blessure' : '');
         row.appendChild(el('span', { class: iconClass, title: REASON_LABEL[categorie], text: REASON_ICON[categorie] }));
+        row.appendChild(el('span', { class: 'player-retour', text: j.retourPrevu || '' }));
         card.appendChild(row);
       });
       teamGrid.appendChild(card);
     });
   }
 
+  // Fixtures are only known for the live "current" gameweek (see
+  // fetchCurrentGameweekState below) — populated once at startup and only
+  // applied when the selected journée matches currentJourneeLabel.
+  var fixturesByEquipe = {};
+  var currentJourneeLabel = null;
+
   function loadJournee(journee) {
     setStatus('Chargement…');
     teamGrid.innerHTML = '';
+    var fixtures = journee === currentJourneeLabel ? fixturesByEquipe : null;
     fetch(API_BASE + '?journee=' + encodeURIComponent(journee))
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (data && data.error) throw new Error(data.error);
         setStatus('');
-        renderTeams(data);
+        renderTeams(data, fixtures);
       })
       .catch(function (err) {
         setStatus('');
@@ -400,23 +453,39 @@
   // jeu-des-pronos already tracks which Ligue 1 gameweek is current (locks
   // open/close around kickoffs); reuse that instead of guessing from
   // Bless/Susp data, which can be filled in far ahead of the actual week.
+  // Its public API only ever exposes the *current* gameweek's fixtures (no
+  // endpoint for an arbitrary journée), so opponent/home-away info is only
+  // ever available for that one journée — see currentJourneeLabel above.
   var PRONOS_API_BASE = 'https://dmytkubjxwwwkroutvdu.supabase.co/functions/v1/api';
   var PRONOS_L1_LEAGUE_ID = '27f27a15-02a9-448a-98d5-80998e2fa52e';
 
-  function fetchCurrentGameweekNumber() {
+  function fetchCurrentGameweekState() {
     return fetch(PRONOS_API_BASE + '/v1/leagues/' + PRONOS_L1_LEAGUE_ID + '/current')
       .then(function (r) { return r.json(); })
-      .then(function (data) { return data && data.gameweek ? data.gameweek.number : null; })
-      .catch(function () { return null; });
+      .then(function (data) {
+        var number = data && data.gameweek ? data.gameweek.number : null;
+        var fixtures = {};
+        (data && data.games || []).forEach(function (g) {
+          var homeName = g.game.home_team.name;
+          var awayName = g.game.away_team.name;
+          var home = PRONOS_TEAM_TO_EQUIPE[homeName] || homeName;
+          var away = PRONOS_TEAM_TO_EQUIPE[awayName] || awayName;
+          fixtures[home] = { opponent: away, isHome: true };
+          fixtures[away] = { opponent: home, isHome: false };
+        });
+        return { number: number, fixtures: fixtures };
+      })
+      .catch(function () { return { number: null, fixtures: {} }; });
   }
 
   Promise.all([
     fetch(API_BASE + '?meta=1').then(function (r) { return r.json(); }),
-    fetchCurrentGameweekNumber()
+    fetchCurrentGameweekState()
   ])
     .then(function (results) {
       var journees = results[0];
-      var currentNumber = results[1];
+      var currentNumber = results[1].number;
+      fixturesByEquipe = results[1].fixtures;
       select.innerHTML = '';
       journees.forEach(function (j) {
         select.appendChild(el('option', { value: j, text: j }));
@@ -424,10 +493,11 @@
       select.disabled = false;
       select.addEventListener('change', function () { loadJournee(select.value); });
 
-      var defaultJournee = currentNumber != null ? 'Journée ' + currentNumber : null;
-      if (!defaultJournee || journees.indexOf(defaultJournee) === -1) {
-        defaultJournee = journees.length ? journees[0] : null;
+      var currentJournee = currentNumber != null ? 'Journée ' + currentNumber : null;
+      if (currentJournee && journees.indexOf(currentJournee) !== -1) {
+        currentJourneeLabel = currentJournee;
       }
+      var defaultJournee = currentJourneeLabel || (journees.length ? journees[0] : null);
       if (defaultJournee) {
         select.value = defaultJournee;
         loadJournee(defaultJournee);
