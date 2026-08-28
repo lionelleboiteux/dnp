@@ -174,8 +174,8 @@ function classify_(text, bgColor) {
   if (normalized === 'HG') return 'hors_groupe';
   if (normalized === 'Transfert') return 'transfert';
   if (normalized === 'Susp' || sameColor_(bgColor, COLOR_SUSPENDED)) return 'suspendu';
+  if (normalized === 'Personnel' || sameColor_(bgColor, COLOR_PERSONAL)) return 'personnel';
   if (sameColor_(bgColor, COLOR_INJURED)) return 'blessure';
-  if (sameColor_(bgColor, COLOR_PERSONAL)) return 'personnel';
   return 'incertain';
 }
 
