@@ -24,33 +24,10 @@
   "inLanguage": "fr"
 }
 </script>
-<!--
-  Google Funding Choices (GDPR consent for EU visitors) — must load before
-  the AdSense script below so ads only fire once consent is resolved. Same
-  pub-6481777982811975 as pronos.fantasy-coach.fr; the banner itself only
-  appears once a "Privacy & messaging" GDPR message is published in that
-  AdSense account, this script is the standard Google-published loader.
--->
-<script async src="https://fundingchoicesmessages.google.com/i/pub-6481777982811975?ers=1"></script>
-<script>
-  (function () {
-    function signalGooglefcPresent() {
-      if (!window.frames['googlefcPresent']) {
-        if (document.body) {
-          var iframe = document.createElement('iframe');
-          iframe.style.cssText = 'width: 0; height: 0; border: none; z-index: -1000; left: -1000px; top: -1000px;';
-          iframe.style.display = 'none';
-          iframe.name = 'googlefcPresent';
-          document.body.appendChild(iframe);
-        } else {
-          setTimeout(signalGooglefcPresent, 0);
-        }
-      }
-    }
-    signalGooglefcPresent();
-  })();
-</script>
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6481777982811975" crossorigin="anonymous"></script>
+<!-- Shared nav/ads/feedback components — see https://github.com/lionelleboiteux/fc-shared -->
+<script src="https://cdn.jsdelivr.net/gh/lionelleboiteux/fc-shared@main/nav.js" defer></script>
+<script src="https://cdn.jsdelivr.net/gh/lionelleboiteux/fc-shared@main/ads.js" async></script>
+<script src="https://cdn.jsdelivr.net/gh/lionelleboiteux/fc-shared@main/feedback.js" defer></script>
 <style>
   :root {
     /* fantasy-coach.fr's own blue (reused from pronos.fantasy-coach.fr) so
@@ -74,34 +51,6 @@
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     line-height: 1.5;
   }
-  .site-banner {
-    background: linear-gradient(180deg, var(--fc-blue-light) 0%, var(--fc-blue) 100%);
-    color: #ffffff;
-    margin: 0 -1rem 1.5rem;
-    padding: 1.25rem 1rem 0;
-  }
-  .site-banner-top {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-    text-align: center;
-  }
-  .site-logo { width: 56px; height: 56px; border-radius: 50%; }
-  .site-title { display: block; font-size: 1.5rem; font-weight: 800; color: #ffffff; text-decoration: none; }
-  .site-tagline { margin: 0.1rem 0 0; font-size: 0.82rem; opacity: 0.9; }
-  .site-nav {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 0.25rem 1rem;
-    margin-top: 1rem;
-    padding: 0.6rem 0;
-    border-top: 1px solid rgba(255, 255, 255, 0.3);
-    font-size: 0.85rem;
-  }
-  .site-nav a { color: #ffffff; text-decoration: none; font-weight: 600; }
   .site-footer { text-align: center; font-size: 0.8rem; color: var(--muted); margin: 2.5rem 0 1rem; }
   main { max-width: 960px; margin: 0 auto; }
   h1 { font-size: 1.4rem; margin: 0.5rem 0 1rem; }
@@ -231,25 +180,7 @@
 </style>
 </head>
 <body>
-<header class="site-banner">
-  <div class="site-banner-top">
-    <a href="https://www.fantasy-coach.fr/">
-      <img class="site-logo" src="https://static.wixstatic.com/media/449182_b075115d95e54908bebcaaef43561929~mv2.png/v1/fill/w_174,h_174,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/newlogo.png" alt="logo fantasy coach">
-    </a>
-    <div>
-      <a class="site-title" href="https://www.fantasy-coach.fr/">Fantasy Coach</a>
-      <p class="site-tagline">La référence Fantasy Foot</p>
-    </div>
-  </div>
-  <nav class="site-nav">
-    <a href="https://www.fantasy-coach.fr/ligue1">Ligue 1</a>
-    <a href="https://www.fantasy-coach.fr/fantasy-l1">Fantasy L1</a>
-    <a href="https://www.fantasy-coach.fr/sorare">Sorare</a>
-    <a href="https://www.fantasy-coach.fr/fpl">FPL</a>
-    <a href="https://www.fantasy-coach.fr/bundesliga">Bundesliga</a>
-    <a href="https://pronos.fantasy-coach.fr/">Pronos</a>
-  </nav>
-</header>
+<fc-nav current="dnp"></fc-nav>
 
 <main id="app">
   <h1>Blessures et suspensions — Ligue 1</h1>
@@ -277,6 +208,8 @@
   <p id="status-line" class="status-line"></p>
   <div id="team-grid" class="team-grid"></div>
   <noscript><p>Activez JavaScript pour afficher les joueurs indisponibles.</p></noscript>
+
+  <fc-feedback project="DNP"></fc-feedback>
 </main>
 
 <footer class="site-footer">&copy;2026 by Fantasy Coach.</footer>
