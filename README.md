@@ -98,7 +98,7 @@ file, append `?api=<url>` to the page's own URL instead.)
   calibrated colors comes back as category `incertain` with the raw sheet text
   shown, rather than being dropped silently.
 - Per-club status pill (shown next to the club name in the header, current
-  journée only): sourced from C544:D562 in the same sheet — C is the club
+  journée only): sourced from C548:D565 in the same sheet — C is the club
   name (must match `Équipe` values), D is the free-text status. It's a flat
   block the maintainer overwrites for the current gameweek rather than one
   per journée, so `Code.gs` returns it on every journee response and

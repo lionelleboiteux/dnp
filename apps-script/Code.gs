@@ -47,11 +47,11 @@ var COL_POSTE_FIN = 7;
 var FIRST_DATA_ROW = 3;
 
 // Per-club status block, well below the player rows: C = club name (matches
-// COL_EQUIPE values), D = free-text status note. A flat 19-row block the
+// COL_EQUIPE values), D = free-text status note. A flat 18-row block the
 // maintainer overwrites for the current gameweek rather than one per
 // journée — see readClubStatuses_.
-var STATUS_FIRST_ROW = 544;
-var STATUS_LAST_ROW = 562;
+var STATUS_FIRST_ROW = 548;
+var STATUS_LAST_ROW = 565;
 var STATUS_COL_EQUIPE = 3;
 var STATUS_COL_TEXT = 4;
 
