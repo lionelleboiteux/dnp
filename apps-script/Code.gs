@@ -11,7 +11,15 @@
  *   ?meta=1            -> ["Journée 1", "Journée 2", ..., "Journée 34"] (chronological;
  *                         the frontend decides which one is "current" via the
  *                         jeu-des-pronos API, not this list's order)
- *   ?journee=Journée 12 -> [{ equipe, joueurs: [{nom, prenom, posteFin, raison, categorie, retourPrevu}] }]
+ *   ?journee=Journée 12 -> [{ equipe, statut, joueurs: [{nom, prenom, posteFin, raison, categorie, retourPrevu}] }]
+ *                         `statut` is a free-text per-club status note (see
+ *                         readClubStatuses_ below) — it's a flat, unversioned
+ *                         block the sheet maintainer overwrites each
+ *                         gameweek rather than one per journée, so it's
+ *                         included on every journee response and it's up to
+ *                         the frontend to only display it next to the live
+ *                         current gameweek (it's meaningless, and possibly
+ *                         stale, for any other journée).
  *
  * Responses are cached in CacheService (script-wide, up to 6h) so repeat
  * requests skip the SpreadsheetApp reads entirely. The cache is invalidated
@@ -37,6 +45,15 @@ var COL_POSTE_FIN = 7;
 
 // Data rows start after the two header rows (main label row + Carton/MN/Bless-Susp sub-header row).
 var FIRST_DATA_ROW = 3;
+
+// Per-club status block, well below the player rows: C = club name (matches
+// COL_EQUIPE values), D = free-text status note. A flat 19-row block the
+// maintainer overwrites for the current gameweek rather than one per
+// journée — see readClubStatuses_.
+var STATUS_FIRST_ROW = 544;
+var STATUS_LAST_ROW = 562;
+var STATUS_COL_EQUIPE = 3;
+var STATUS_COL_TEXT = 4;
 
 // CacheService's own cap; also used as a safety-net TTL in case an edit
 // somehow doesn't trigger onEdit below.
@@ -65,6 +82,10 @@ function doGet(e) {
       return jsonResponse_({ error: 'Journée inconnue: ' + journee });
     }
     payload = readUnavailablePlayers_(sheet, cols);
+    var statuses = readClubStatuses_(sheet);
+    payload.forEach(function (team) {
+      team.statut = statuses[team.equipe] || '';
+    });
   }
 
   var json = JSON.stringify(payload);
@@ -164,6 +185,23 @@ function readUnavailablePlayers_(sheet, cols) {
   return Object.keys(byTeam).sort().map(function (equipe) {
     return { equipe: equipe, joueurs: byTeam[equipe] };
   });
+}
+
+/**
+ * Reads the C544:D562 status block (see STATUS_* constants above) into a
+ * { equipe: statut } map. Rows with a blank club or blank status are
+ * skipped rather than surfaced as an empty note.
+ */
+function readClubStatuses_(sheet) {
+  var numRows = STATUS_LAST_ROW - STATUS_FIRST_ROW + 1;
+  var values = sheet.getRange(STATUS_FIRST_ROW, STATUS_COL_EQUIPE, numRows, 2).getValues();
+  var byTeam = {};
+  values.forEach(function (row) {
+    var equipe = String(row[0] || '').trim();
+    var statut = String(row[1] || '').trim();
+    if (equipe && statut) byTeam[equipe] = statut;
+  });
+  return byTeam;
 }
 
 function classify_(text, bgColor) {

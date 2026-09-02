@@ -92,12 +92,25 @@
   }
   .team-card h2 {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 0.55rem;
+    gap: 0.4rem 0.55rem;
     font-size: 1.05rem;
     margin: 0 0 0.6rem;
     padding-bottom: 0.5rem;
     border-bottom: 2px solid var(--accent);
+  }
+  .team-status {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--accent);
+    background: #eaf3fc;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 12rem;
   }
   .team-fixture {
     margin-left: auto;
@@ -322,7 +335,7 @@
       .toUpperCase();
   }
 
-  function renderTeams(teams, fixturesByEquipe) {
+  function renderTeams(teams, fixturesByEquipe, showStatus) {
     teamGrid.innerHTML = '';
     if (!teams || teams.length === 0) {
       teamGrid.appendChild(el('div', { class: 'empty-state', text: 'Aucun joueur indisponible pour cette journée.' }));
@@ -342,6 +355,9 @@
         heading.appendChild(el('span', { class: 'team-logo-fallback', text: teamInitials(team.equipe) }));
       }
       heading.appendChild(el('span', { text: team.equipe }));
+      if (showStatus && team.statut) {
+        heading.appendChild(el('span', { class: 'team-status', text: team.statut }));
+      }
       var fixture = fixturesByEquipe && fixturesByEquipe[team.equipe];
       if (fixture) {
         var icon = fixture.isHome ? '🏠' : '✈️';
@@ -372,13 +388,14 @@
   function loadJournee(journee) {
     setStatus('Chargement…');
     teamGrid.innerHTML = '';
-    var fixtures = journee === currentJourneeLabel ? fixturesByEquipe : null;
+    var isCurrent = journee === currentJourneeLabel;
+    var fixtures = isCurrent ? fixturesByEquipe : null;
     fetch(API_BASE + '?journee=' + encodeURIComponent(journee))
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (data && data.error) throw new Error(data.error);
         setStatus('');
-        renderTeams(data, fixtures);
+        renderTeams(data, fixtures, isCurrent);
       })
       .catch(function (err) {
         setStatus('');
