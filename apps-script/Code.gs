@@ -208,7 +208,7 @@ function classify_(text, bgColor) {
   // A trailing "?" (e.g. "Transfert ?") marks the same category as the
   // plain value, just less certain — strip it before matching.
   var normalized = String(text || '').replace(/\s*\?\s*$/, '').trim();
-  if (normalized === 'Disponible') return 'disponible';
+  if (normalized === 'Disponible' || normalized.toLowerCase() === 'dans le groupe') return 'disponible';
   if (normalized === 'HG') return 'hors_groupe';
   if (normalized === 'Transfert') return 'transfert';
   if (normalized === 'Susp' || sameColor_(bgColor, COLOR_SUSPENDED)) return 'suspendu';
