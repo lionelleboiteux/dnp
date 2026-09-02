@@ -335,6 +335,13 @@
       .toUpperCase();
   }
 
+  // Sheet uses the terse "Susp" abbreviation (see classify_ in Code.gs,
+  // which also treats a trailing "?" as the same category); spell it out
+  // for display without touching the raw category matching.
+  function formatRaison(raison) {
+    return String(raison || '').replace(/^Susp(\s*\?)?$/, 'Suspendu$1');
+  }
+
   function renderTeams(teams, fixturesByEquipe, showStatus) {
     teamGrid.innerHTML = '';
     if (!teams || teams.length === 0) {
@@ -369,7 +376,7 @@
         var row = el('div', { class: 'player-row' });
         row.appendChild(el('span', { class: 'player-poste', text: j.posteFin || '' }));
         row.appendChild(el('span', { class: 'player-name', text: j.prenom + ' ' + j.nom }));
-        row.appendChild(el('span', { class: 'player-raison', text: j.raison }));
+        row.appendChild(el('span', { class: 'player-raison', text: formatRaison(j.raison) }));
         var iconClass = 'player-icon' + (categorie === 'blessure' ? ' icon-blessure' : '');
         row.appendChild(el('span', { class: iconClass, title: REASON_LABEL[categorie], text: REASON_ICON[categorie] }));
         row.appendChild(el('span', { class: 'player-retour', text: j.retourPrevu || '' }));
