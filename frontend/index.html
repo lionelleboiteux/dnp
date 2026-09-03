@@ -302,30 +302,6 @@
     'Le Mans FC': 'https://s3.eu-west-1.amazonaws.com/image.mpg/daabb8d9-230e-4fe2-8214-682fbbdedb5e'
   };
 
-  // Maps pronos Supabase `teams.name` (full official names) to this sheet's
-  // shorter `Equipe` values, same hand-matching as TEAM_LOGOS above. Built
-  // from the L1 rows of the pronos /v1/teams endpoint.
-  var PRONOS_TEAM_TO_EQUIPE = {
-    'AJ Auxerre': 'Auxerre',
-    'Angers SCO': 'Angers',
-    'AS Monaco': 'Monaco',
-    'Estac Troyes': 'Troyes',
-    'FC Lorient': 'Lorient',
-    'Havre Athletic Club': 'Le Havre',
-    'Le Mans FC': 'Le Mans',
-    'LOSC Lille': 'Lille',
-    'OGC Nice': 'Nice',
-    'Olympique de Marseille': 'Marseille',
-    'Olympique Lyonnais': 'Lyon',
-    'Paris FC': 'Paris FC',
-    'Paris Saint-Germain': 'Paris SG',
-    'RC Lens': 'Lens',
-    'RC Strasbourg Alsace': 'Strasbourg',
-    'Stade Brestois 29': 'Brest',
-    'Stade Rennais FC': 'Rennes',
-    'Toulouse FC': 'Toulouse'
-  };
-
   function teamInitials(equipe) {
     return String(equipe || '?')
       .split(/\s+/)
@@ -342,7 +318,7 @@
     return String(raison || '').replace(/^Susp(\s*\?)?$/, 'Suspendu$1');
   }
 
-  function renderTeams(teams, fixturesByEquipe, showStatus) {
+  function renderTeams(teams, showStatus) {
     teamGrid.innerHTML = '';
     if (!teams || teams.length === 0) {
       teamGrid.appendChild(el('div', { class: 'empty-state', text: 'Aucun joueur indisponible pour cette journée.' }));
@@ -365,10 +341,9 @@
       if (showStatus && team.statut) {
         heading.appendChild(el('span', { class: 'team-status', text: team.statut }));
       }
-      var fixture = fixturesByEquipe && fixturesByEquipe[team.equipe];
-      if (fixture) {
-        var icon = fixture.isHome ? '🏠' : '✈️';
-        heading.appendChild(el('span', { class: 'team-fixture', text: icon + ' vs ' + fixture.opponent }));
+      if (team.fixture) {
+        var icon = team.fixture.isHome ? '🏠' : '✈️';
+        heading.appendChild(el('span', { class: 'team-fixture', text: icon + ' vs ' + team.fixture.opponent }));
       }
       card.appendChild(heading);
       team.joueurs.forEach(function (j) {
@@ -386,23 +361,22 @@
     });
   }
 
-  // Fixtures are only known for the live "current" gameweek (see
-  // fetchCurrentGameweekState below) — populated once at startup and only
-  // applied when the selected journée matches currentJourneeLabel.
-  var fixturesByEquipe = {};
+  // Which journée is "current" only matters for whether to show `statut`
+  // (see doc comment at the top of Code.gs) -- `fixture` now comes straight
+  // off every ?journee= response, for any journée, so no separate fetch or
+  // gating is needed for it any more.
   var currentJourneeLabel = null;
 
   function loadJournee(journee) {
     setStatus('Chargement…');
     teamGrid.innerHTML = '';
     var isCurrent = journee === currentJourneeLabel;
-    var fixtures = isCurrent ? fixturesByEquipe : null;
     fetch(API_BASE + '?journee=' + encodeURIComponent(journee))
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (data && data.error) throw new Error(data.error);
         setStatus('');
-        renderTeams(data, fixtures, isCurrent);
+        renderTeams(data, isCurrent);
       })
       .catch(function (err) {
         setStatus('');
@@ -413,39 +387,23 @@
   // jeu-des-pronos already tracks which Ligue 1 gameweek is current (locks
   // open/close around kickoffs); reuse that instead of guessing from
   // Bless/Susp data, which can be filled in far ahead of the actual week.
-  // Its public API only ever exposes the *current* gameweek's fixtures (no
-  // endpoint for an arbitrary journée), so opponent/home-away info is only
-  // ever available for that one journée — see currentJourneeLabel above.
   var PRONOS_API_BASE = 'https://dmytkubjxwwwkroutvdu.supabase.co/functions/v1/api';
   var PRONOS_L1_LEAGUE_ID = '27f27a15-02a9-448a-98d5-80998e2fa52e';
 
-  function fetchCurrentGameweekState() {
+  function fetchCurrentGameweekNumber() {
     return fetch(PRONOS_API_BASE + '/v1/leagues/' + PRONOS_L1_LEAGUE_ID + '/current')
       .then(function (r) { return r.json(); })
-      .then(function (data) {
-        var number = data && data.gameweek ? data.gameweek.number : null;
-        var fixtures = {};
-        (data && data.games || []).forEach(function (g) {
-          var homeName = g.game.home_team.name;
-          var awayName = g.game.away_team.name;
-          var home = PRONOS_TEAM_TO_EQUIPE[homeName] || homeName;
-          var away = PRONOS_TEAM_TO_EQUIPE[awayName] || awayName;
-          fixtures[home] = { opponent: away, isHome: true };
-          fixtures[away] = { opponent: home, isHome: false };
-        });
-        return { number: number, fixtures: fixtures };
-      })
-      .catch(function () { return { number: null, fixtures: {} }; });
+      .then(function (data) { return data && data.gameweek ? data.gameweek.number : null; })
+      .catch(function () { return null; });
   }
 
   Promise.all([
     fetch(API_BASE + '?meta=1').then(function (r) { return r.json(); }),
-    fetchCurrentGameweekState()
+    fetchCurrentGameweekNumber()
   ])
     .then(function (results) {
       var journees = results[0];
-      var currentNumber = results[1].number;
-      fixturesByEquipe = results[1].fixtures;
+      var currentNumber = results[1];
       select.innerHTML = '';
       journees.forEach(function (j) {
         select.appendChild(el('option', { value: j, text: j }));
