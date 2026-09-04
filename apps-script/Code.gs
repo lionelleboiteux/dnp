@@ -23,7 +23,7 @@
  *                         `fixture` is { opponent, isHome, kickoff } | null,
  *                         read from the "Fixtures" sheet tab (see
  *                         readFixturesForGameweek_), kept up to date by a 6h
- *                         trigger (refreshFixtures_/setupFixturesTrigger_)
+ *                         trigger (refreshFixtures/setupFixturesTrigger)
  *                         that fetches from ma-api.ligue1.fr — never live on
  *                         this request path. Available for every journée,
  *                         not just the current one (unlike `statut` above).
@@ -275,8 +275,8 @@ function debugColors() {
 // lookup (readFixturesForGameweek_) is a pure Sheet read, no external call
 // on the request path, and works for every journée.
 //
-// Setup (once, in the Apps Script editor): run setupFixturesTrigger_, then
-// run refreshFixtures_ once by hand to populate the tab immediately rather
+// Setup (once, in the Apps Script editor): run setupFixturesTrigger, then
+// run refreshFixtures once by hand to populate the tab immediately rather
 // than waiting for the first scheduled firing.
 
 // jeu-des-pronos already tracks the current Ligue 1 gameweek (same API the
@@ -427,7 +427,7 @@ function readFixturesForGameweek_(gameweekNumber) {
  * Builds one gameweek's fixture rows from ma-api.ligue1.fr's match-week
  * list. Returns [] (never a partial result) on any failure, so a transient
  * API hiccup can't overwrite already-cached good data — see
- * refreshFixtures_'s "only replace when non-empty" rule.
+ * refreshFixtures's "only replace when non-empty" rule.
  */
 function buildFixtureRowsForGameweek_(gameweekNumber) {
   var journee = 'Journée ' + gameweekNumber;
@@ -461,7 +461,7 @@ function buildFixtureRowsForGameweek_(gameweekNumber) {
  * the doGet response cache version so the next request sees fresh data
  * immediately instead of waiting out the 6h TTL.
  */
-function refreshFixtures_() {
+function refreshFixtures() {
   var sheet = getOrCreateFixturesSheet_();
   var byGw = readAllFixtureRows_(sheet);
   var current = fetchCurrentGameweekNumber_();
@@ -503,13 +503,13 @@ function refreshFixtures_() {
 /**
  * One-time setup: run this once from the Apps Script editor to install the
  * 6h trigger. Re-running is safe — clears any trigger it previously
- * installed for refreshFixtures_ first, so triggers never stack up. Run
- * refreshFixtures_ once by hand afterward to populate the Fixtures tab
+ * installed for refreshFixtures first, so triggers never stack up. Run
+ * refreshFixtures once by hand afterward to populate the Fixtures tab
  * immediately instead of waiting for the first scheduled firing.
  */
-function setupFixturesTrigger_() {
+function setupFixturesTrigger() {
   ScriptApp.getProjectTriggers().forEach(function (t) {
-    if (t.getHandlerFunction() === 'refreshFixtures_') ScriptApp.deleteTrigger(t);
+    if (t.getHandlerFunction() === 'refreshFixtures') ScriptApp.deleteTrigger(t);
   });
-  ScriptApp.newTrigger('refreshFixtures_').timeBased().everyHours(6).create();
+  ScriptApp.newTrigger('refreshFixtures').timeBased().everyHours(6).create();
 }
