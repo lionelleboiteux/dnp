@@ -37,15 +37,10 @@ frontend/index.html (static, GitHub Pages, l1.dnp.fantasy-coach.fr)
    (Project Settings > "Show appsscript.json in editor" to expose it), or
    just apply its `webapp` settings via Deploy settings in the next step.
 
-   Alternatively, if you have [`clasp`](https://github.com/google/clasp)
-   installed and are logged in (`npm i -g @google/clasp && clasp login`),
-   you can push this repo's `apps-script/` directory directly instead of
-   copy-pasting:
-   ```
-   cd apps-script
-   clasp create --type sheets --parentId <SPREADSHEET_ID> --rootDir .
-   clasp push
-   ```
+   Alternatively, use `clasp` — see [Updating the Apps Script with
+   clasp](#updating-the-apps-script-with-clasp) below, which pushes this
+   repo's `apps-script/` directory straight to the live project instead of
+   copy-pasting.
 
 3. **Calibrate the reason colors** — the exact pink/green/red hex codes the
    sheet uses aren't known yet. In the Apps Script editor, select
@@ -65,6 +60,50 @@ frontend/index.html (static, GitHub Pages, l1.dnp.fantasy-coach.fr)
    - `<url>?meta=1` should return a JSON array of journée names.
    - `<url>?journee=Journée 1` (URL-encode the space) should return the
      per-team unavailable-player list.
+
+### Updating the Apps Script with clasp
+
+This repo's `apps-script/.clasp.json` already points at the live project
+(script ID `1PxsLCYHtnKT9Og_i9FdvNMpERGOqol8u37a53Cz6k4-A5wUUu4-zJVfw`), so
+after editing `Code.gs` or `appsscript.json` you can push and redeploy
+straight from the command line instead of copy-pasting into the Apps
+Script editor:
+
+```
+npm i -g @google/clasp
+clasp login                                # once per machine/account
+cd apps-script
+clasp push                                 # uploads Code.gs + appsscript.json
+clasp deployments                          # find the deployment ID matching
+                                            # the /exec URL in frontend/index.html
+clasp deploy -i <deploymentId>             # points the live Web App at the
+                                            # version just pushed
+```
+
+Gotchas:
+
+- **`clasp login` needs its own account authorization.** If you're not
+  already logged in as an account with edit access to the sheet, run
+  `clasp logout` first, then `clasp login` again to switch accounts.
+- **"User has not enabled the Apps Script API"** on push/deploy: the
+  logged-in account needs to enable it once at
+  https://script.google.com/home/usersettings.
+- **`clasp push` skips manifest changes by default** — pass `clasp push
+  --force` if `appsscript.json` itself changed (e.g. `timeZone`), otherwise
+  the live manifest silently keeps its old values even though `Code.gs`
+  updates fine.
+- **The big one**: `appsscript.json`'s `"executeAs": "USER_DEPLOYING"`
+  means the Web App runs under whichever Google account most recently
+  created or updated *that specific deployment* — not necessarily the
+  account that originally set it up. If you `clasp deploy` with a
+  different account than before, and that account has never been through
+  Google's interactive OAuth consent for this script (Sheets access,
+  etc.), every request to the public `/exec` URL will start failing with a
+  Drive "You need access" 403 page — for **any** version, including a
+  rollback, since the problem is the identity, not the code. Fix: open the
+  project in the Apps Script editor as that account and run any function
+  once (e.g. select `doGet`, click Run) to trigger and accept the
+  authorization prompt, then redeploy.
 
 ### 2. Point the frontend at the Web App
 
@@ -90,10 +129,12 @@ file, append `?api=<url>` to the page's own URL instead.)
   hardcoded as `COL_*` constants at the top of `Code.gs` — if a column is
   ever inserted/removed to the left of `Poste fin`, update those constants
   to match.
-- Whenever Apps Script code changes, redeploy is manual (Deploy > Manage
-  deployments > edit > new version) — this isn't wired into CI, unlike the
-  frontend, since it's expected to change rarely once the color calibration
-  is done.
+- Whenever Apps Script code changes, redeploy is manual — either via
+  `clasp push` + `clasp deploy` (see [Updating the Apps Script with
+  clasp](#updating-the-apps-script-with-clasp)) or Deploy > Manage
+  deployments > edit > new version in the editor. This isn't wired into
+  CI, unlike the frontend, since it's expected to change rarely once the
+  color calibration is done.
 - Any `Bless/Susp` text that doesn't match `HG`/`Susp`/one of the two
   calibrated colors comes back as category `incertain` with the raw sheet text
   shown, rather than being dropped silently.
