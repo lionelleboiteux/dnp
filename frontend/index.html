@@ -318,6 +318,11 @@
     return String(raison || '').replace(/^Susp(\s*\?)?$/, 'Suspendu$1');
   }
 
+  function formatPlayerName(prenom, nom) {
+    var initial = String(prenom || '').trim().charAt(0);
+    return String(nom || '').trim() + (initial ? ' ' + initial + '.' : '');
+  }
+
   function renderTeams(teams, showStatus) {
     teamGrid.innerHTML = '';
     if (!teams || teams.length === 0) {
@@ -350,7 +355,7 @@
         var categorie = REASON_ICON.hasOwnProperty(j.categorie) ? j.categorie : 'incertain';
         var row = el('div', { class: 'player-row' });
         row.appendChild(el('span', { class: 'player-poste', text: j.posteFin || '' }));
-        row.appendChild(el('span', { class: 'player-name', text: j.prenom + ' ' + j.nom }));
+        row.appendChild(el('span', { class: 'player-name', text: formatPlayerName(j.prenom, j.nom) }));
         row.appendChild(el('span', { class: 'player-raison', text: formatRaison(j.raison) }));
         var iconClass = 'player-icon' + (categorie === 'blessure' ? ' icon-blessure' : '');
         row.appendChild(el('span', { class: iconClass, title: REASON_LABEL[categorie], text: REASON_ICON[categorie] }));
