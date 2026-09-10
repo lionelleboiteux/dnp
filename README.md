@@ -286,12 +286,14 @@ either the Worker or Apps Script directly.)
   relegation cycle not yet reflected here, falls back to the colored
   initials badge (`teamInitials()`) — same fallback also covers any crest
   URL that 404s at runtime.
-- "Next journée to be played" (the default selection and the top of the
-  dropdown) is inferred by `orderedJourneeList_()` in `Code.gs`: it scans
-  the `MN` column for each journée and treats the first entirely-blank one
-  as not yet played, assuming played weeks fill in left-to-right without
-  gaps. If the sheet is ever updated out of order this heuristic can be
-  wrong for one week until the gap is filled in.
+- **Default/"current" journée selection**: `frontend/index.html` does *not*
+  infer this from the sheet at all. It fetches the live current Ligue 1
+  gameweek from the public jeu-des-pronos API
+  (`/v1/leagues/{id}/current`, same endpoint `Code.gs`'s
+  `fetchCurrentGameweekNumber_` uses server-side for the Fixtures refresh)
+  and defaults the dropdown to `'Journée ' + that number`, falling back to
+  the first journée in the `?meta=1` list if that call fails or the
+  computed label isn't in the list.
 - Opponent/home-away badges (🏠/✈️ next to each team name) come from the
   pronos Supabase API's `/v1/leagues/{id}/current` endpoint, fetched
   alongside the current-gameweek lookup in `frontend/index.html`. That
