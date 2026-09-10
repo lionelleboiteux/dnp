@@ -232,8 +232,15 @@
   // ?api=<url> overrides the default for local/dev testing only; never
   // persisted, so production use is unaffected. Same convention as
   // pronos.fantasy-coach.fr's frontend.
+  //
+  // Default points at the Cloudflare Worker cache (worker/), not the Apps
+  // Script /exec URL directly -- the Worker mirrors that same API from
+  // Workers KV, so ordinary visits skip Apps Script's cold-start entirely.
+  // The Apps Script URL is still reachable directly via ?api=<that URL>
+  // for debugging (e.g. to check whether a discrepancy is the Worker's
+  // cache being stale vs. Apps Script itself misbehaving).
   var API_BASE = new URLSearchParams(location.search).get('api') ||
-    'https://script.google.com/macros/s/AKfycbwZHHaCpgDtPribC2eckuaoOqEyBJDi4FfPE2aIIaNS0V4H7stSjaBNiqhKyVf-eU3d/exec';
+    'https://dnp-l1-cache.fantasycoachfr.workers.dev';
 
   var REASON_ICON = {
     disponible: '✅',

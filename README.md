@@ -19,11 +19,24 @@ Google Sheet (private)
       |
       v
 Apps Script Web App (apps-script/Code.gs)   <-- runs as the sheet owner/editor,
-      |                                          reads text + cell colors
+      |    ^                                    reads text + cell colors
+      |    | webhook on edit (worker/, see
+      |    | "Cloudflare Worker cache" below)
+      |    |
+      v    |
+Cloudflare Worker + Workers KV (worker/)    <-- edge cache; ordinary visits
+      |                                          never wait on Apps Script's
       | JSON (only nom/prenom/posteFin/raison/categorie/retourPrevu — never the raw sheet)
       v
 frontend/index.html (static, GitHub Pages, l1.dnp.fantasy-coach.fr)
 ```
+
+The frontend talks to the Cloudflare Worker cache below, not straight to
+Apps Script — it exists because Apps Script's own container spins down when
+idle (a cold request can hang 10-40s), so ordinary visits go through the
+Worker's Cloudflare KV cache instead of hitting Apps Script directly; the
+Sheet's own edit hooks push fresh data into that cache proactively, so
+nobody pays the cold-start cost.
 
 ## Setup
 
@@ -105,13 +118,120 @@ Gotchas:
   once (e.g. select `doGet`, click Run) to trigger and accept the
   authorization prompt, then redeploy.
 
-### 2. Point the frontend at the Web App
+### 2. Cloudflare Worker cache (edge caching in front of the Apps Script API)
 
-Edit `frontend/index.html`, replace `REPLACE_WITH_APPS_SCRIPT_WEB_APP_URL`
-with the Web App URL from step 1.6. (For local testing without editing the
-file, append `?api=<url>` to the page's own URL instead.)
+`worker/` is a small Cloudflare Worker that caches the Apps Script JSON API
+(`?meta=1` and `?journee=...`) in Workers KV, so an ordinary visit never has
+to wait on Apps Script's cold start (10-40s after the container's been idle).
+The frontend fetches from the Worker instead of Apps Script directly; the
+Sheet's own edit hooks (`onEditCacheWebhook_`, `refreshFixtures` in
+`Code.gs`) push the affected journée straight into the Worker's cache the
+moment something changes, rather than waiting for the next visitor to
+trigger a lazy re-fetch.
 
-### 3. Host it
+Setup (once):
+
+```bash
+cd worker
+npm install
+wrangler login                          # if not already logged in
+wrangler kv namespace create DNP_CACHE  # paste the printed id into wrangler.jsonc's kv_namespaces[0].id
+                                         # (title just needs to be distinct account-wide;
+                                         # the "binding" name in wrangler.jsonc, which the
+                                         # code actually uses, stays "CACHE")
+wrangler secret put REVALIDATE_SECRET   # pick a random long string
+wrangler deploy
+```
+
+Then, one-time, populate the cache for every journée that already has data:
+
+```bash
+curl -X POST "https://<your-worker>.workers.dev/__warm-all?secret=<REVALIDATE_SECRET>"
+```
+
+And wire up the Apps Script side so edits actually reach the Worker — in the
+Apps Script editor:
+
+1. **Project Settings > Script Properties > Add script property**, twice:
+   - `CACHE_WEBHOOK_URL` = `https://<your-worker>.workers.dev/__revalidate`
+   - `CACHE_WEBHOOK_SECRET` = the exact same value passed to `wrangler secret put` above
+2. In the function dropdown, select `setupCacheWebhookTrigger` and click
+   **Run** once (grant the requested permissions — it needs to manage
+   triggers). This installs an **installable** onEdit trigger specifically
+   for the webhook call; re-running later is safe.
+
+Gotchas:
+
+- **Why an installable trigger, not just `onEdit(e)`**: Apps Script's
+  simple triggers (the plain global `onEdit(e)` function) are barred by the
+  platform from calling any service that requires authorization —
+  `UrlFetchApp` included — even once the script already has that scope.
+  This fails **completely silently** (no error surfaced anywhere) if you
+  try it anyway. `notifyCacheWebhook_` itself is *also* silent by design
+  when misconfigured (see the next gotcha), which made this genuinely hard
+  to tell apart from a trigger problem the first time — the fix that
+  actually found it was temporarily adding `console.log` calls in
+  `onEditCacheWebhook_`/`notifyCacheWebhook_` and reading them back from
+  the Apps Script editor's Executions log after a real edit.
+- **`notifyCacheWebhook_` no-ops silently if `CACHE_WEBHOOK_URL` or
+  `CACHE_WEBHOOK_SECRET` is missing, empty, or misspelled** — by design,
+  so the feature is safe to leave unconfigured, but it also means a typo'd
+  property name produces *zero* signal anywhere (no error in Executions,
+  no request in `wrangler tail`, nothing) rather than an obvious failure.
+  If edits aren't reaching the Worker, double-check the two Script
+  Properties are spelled exactly right before suspecting anything else —
+  this is more likely than either the trigger or the Worker being broken.
+- **KV namespace titles are account-wide, not per-Worker** — `wrangler kv
+  namespace create CACHE` fails with "already exists" if any other Worker
+  on the account (e.g. the sibling [`compos`](../compos) project) already
+  created one with that exact title. Pick a distinct title
+  (`DNP_CACHE` here); the `binding` name your code actually references
+  (`CACHE`) is independent and can stay the same across projects.
+- **Cloudflare's `ctx.waitUntil()` has a hard 30-second ceiling** for the
+  whole invocation (shared across every `waitUntil` call in that request).
+  Apps Script's cold start alone can take up to 40s, so the revalidate
+  webhook path uses a single, un-retried, 25s-per-target attempt, run in
+  parallel across targets via `Promise.all` (see `revalidateAll` in
+  `worker/src/index.js`) rather than a sequential retry loop, to fit the
+  common case (an edit's own journée + `meta`, i.e. 2 targets) safely
+  inside the budget. The **fallback path is different**: an edit to any
+  identity column (nom/prénom/équipe/poste/retour prévu — see
+  `targetedJourneesFromEdit_`) or the per-club status block can't be
+  targeted to one journée, so it revalidates *all* 34 at once — that
+  reliably blows past both the 30s ceiling and the Workers Free plan's
+  ~50-subrequest-per-invocation cap, leaving several journées stale until
+  the next edit corrects them. This is expected, accepted degradation, not
+  a bug: the common case (editing one player's status) stays fast and
+  fully covered.
+- **KV writes can take up to ~60s to propagate** to Cloudflare edge
+  locations other than the one that handled the revalidation webhook — an
+  accepted, low-impact limitation, not something worth engineering around
+  at this project's traffic scale.
+- Re-run `/__warm-all` any time the KV namespace is recreated, or after a
+  long period with the Worker undeployed. If it also hits the
+  ~50-subrequest cap partway through (visible as `"Too many subrequests by
+  single Worker invocation"` in its JSON response), just hit the normal
+  `GET /?journee=...` endpoint directly for whichever journées it didn't
+  reach — each request is its own Worker invocation with its own budget,
+  so looping over them individually (e.g. with `curl`) finishes the
+  backfill.
+- No automated CI deploy for the Worker (unlike the frontend's `pages.yml`)
+  — `wrangler deploy` from `worker/` is manual, matching how Apps Script
+  deploys are also manual via `clasp` in this repo.
+
+### 3. Point the frontend at the Web App
+
+Edit `frontend/index.html`'s `API_BASE` default (currently the Cloudflare
+Worker's `workers.dev` URL — see [Cloudflare Worker
+cache](#2-cloudflare-worker-cache-edge-caching-in-front-of-the-apps-script-api)
+above) to point at your own Worker deployment. Apps Script's `/exec` URL
+from step 1.6 is only used internally by the Worker (`APPS_SCRIPT_BASE` in
+`worker/wrangler.jsonc`) and directly via `?api=<apps-script-url>` for
+debugging. (For local testing without editing the file, append
+`?api=<url>` to the page's own URL instead — same override, works against
+either the Worker or Apps Script directly.)
+
+### 4. Host it
 
 1. Create a GitHub repo for this directory, push `main`.
 2. Repo Settings > Pages > Source: **GitHub Actions** (the included
@@ -123,6 +243,17 @@ file, append `?api=<url>` to the page's own URL instead.)
 
 ## Notes
 
+- **Caching**: two independent layers. `Code.gs`'s own `CacheService`
+  (script-side, up to 6h, invalidated by bumping a version stamp on
+  `onEdit`) protects `SpreadsheetApp` reads from repeat requests; the
+  Cloudflare Worker (see [Cloudflare Worker
+  cache](#2-cloudflare-worker-cache-edge-caching-in-front-of-the-apps-script-api)
+  above) sits in front of *that*, in Workers KV, so an ordinary visit skips
+  Apps Script's cold start (10-40s) entirely, not just its Sheet reads. The
+  Worker's cache is invalidated by `onEditCacheWebhook_` pushing the
+  affected journée(s) straight into KV, targeted from the edited column(s)
+  when possible (`targetedJourneesFromEdit_`) — see the Worker section's
+  gotchas for the identity-column fallback case.
 - Sheet's fixed left-hand identity columns are, 1-indexed: A (unused/checkbox),
   B `Retour prévu` (free text, per player, not per journée), C `Nom`,
   D `Prénom`, E `Équipe`, F (unused), G `Poste fin`. These offsets are

@@ -1,0 +1,16 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "dnp-l1-cache",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-08",
+  "observability": { "enabled": true },
+  "kv_namespaces": [
+    { "binding": "CACHE", "id": "d7c83cfc36bd49e6bb48c6d0b046d443" }
+  ],
+  "vars": {
+    // Not a secret -- this exact URL is already public, embedded in
+    // frontend/index.html today. Kept as a var (not a secret) so it's
+    // visible/diffable in version control like everything else here.
+    "APPS_SCRIPT_BASE": "https://script.google.com/macros/s/AKfycbwZHHaCpgDtPribC2eckuaoOqEyBJDi4FfPE2aIIaNS0V4H7stSjaBNiqhKyVf-eU3d/exec"
+  }
+}
