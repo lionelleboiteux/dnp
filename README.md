@@ -270,13 +270,13 @@ either the Worker or Apps Script directly.)
   calibrated colors comes back as category `incertain` with the raw sheet text
   shown, rather than being dropped silently.
 - Per-club status pill (shown next to the club name in the header, current
-  journée only): sourced from C548:D565 in the same sheet — C is the club
-  name (must match `Équipe` values), D is the free-text status. It's a flat
-  block the maintainer overwrites for the current gameweek rather than one
-  per journée, so `Code.gs` returns it on every journee response and
-  `frontend/index.html` only renders it when the selected journée matches
-  the live current gameweek (`STATUS_*` constants in `Code.gs`, `.team-status`
-  in the frontend).
+  journée only): sourced from A2:B19 in the **"Mise à jour"** tab — A is the
+  club name (must match `Équipe` values), B is the free-text status; row 1
+  is a header. It's a flat block the maintainer overwrites for the current
+  gameweek rather than one per journée, so `Code.gs` returns it on every
+  journee response and `frontend/index.html` only renders it when the
+  selected journée matches the live current gameweek (`STATUS_*` constants
+  in `Code.gs`, `.team-status` in the frontend).
 - Team logos: sourced from the pronos Supabase `teams` table and hardcoded
   in `TEAM_LOGOS` in `frontend/index.html`, matched by hand against this
   sheet's `Equipe` values. Troyes and Le Mans are this season's promoted

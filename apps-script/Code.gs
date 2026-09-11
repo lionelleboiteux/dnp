@@ -53,14 +53,16 @@ var COL_POSTE_FIN = 7;
 // Data rows start after the two header rows (main label row + Carton/MN/Bless-Susp sub-header row).
 var FIRST_DATA_ROW = 3;
 
-// Per-club status block, well below the player rows: C = club name (matches
-// COL_EQUIPE values), D = free-text status note. A flat 18-row block the
-// maintainer overwrites for the current gameweek rather than one per
-// journée — see readClubStatuses_.
-var STATUS_FIRST_ROW = 548;
-var STATUS_LAST_ROW = 565;
-var STATUS_COL_EQUIPE = 3;
-var STATUS_COL_TEXT = 4;
+// Per-club status block, its own tab: A = club name (matches COL_EQUIPE
+// values), B = free-text status note. Row 1 is a header; row 2 onward is a
+// flat 18-row block (one per Ligue 1 club) the maintainer overwrites for
+// the current gameweek rather than one per journée — see
+// readClubStatuses_.
+var SHEET_NAME_STATUS = 'Mise à jour';
+var STATUS_FIRST_ROW = 2;
+var STATUS_LAST_ROW = 19;
+var STATUS_COL_EQUIPE = 1;
+var STATUS_COL_TEXT = 2;
 
 // CacheService's own cap; also used as a safety-net TTL in case an edit
 // somehow doesn't trigger onEdit below.
@@ -89,7 +91,7 @@ function doGet(e) {
       return jsonResponse_({ error: 'Journée inconnue: ' + journee });
     }
     payload = readUnavailablePlayers_(sheet, cols);
-    var statuses = readClubStatuses_(sheet);
+    var statuses = readClubStatuses_();
     var targetGw = gameweekNumberFromJournee_(journee);
     var fixturesByEquipe = isNaN(targetGw) ? {} : readFixturesForGameweek_(targetGw);
     payload.forEach(function (team) {
@@ -226,10 +228,9 @@ function allKnownJournees_() {
  * payload (see readUnavailablePlayers_), so this returns null there to mean
  * "can't narrow it down, revalidate everything" rather than a specific
  * list — same conservative fallback used for an edit on any other sheet
- * (e.g. "Fixtures", which is script-written anyway and never fires onEdit).
- * This also safely covers the per-club status block (STATUS_* constants),
- * which lives further down the sheet but reuses columns C/D — status text
- * is likewise embedded in every journée's payload (see doGet).
+ * (e.g. "Fixtures", which is script-written anyway and never fires onEdit;
+ * or the "Mise à jour" per-club status tab, whose text is likewise
+ * embedded in every journée's payload — see readClubStatuses_/doGet).
  *
  * Returns [] (not null) when the edit is inside the main sheet's data area
  * but doesn't overlap any known journée's 3-column group (e.g. a stray
@@ -328,11 +329,14 @@ function readUnavailablePlayers_(sheet, cols) {
 }
 
 /**
- * Reads the C544:D562 status block (see STATUS_* constants above) into a
- * { equipe: statut } map. Rows with a blank club or blank status are
- * skipped rather than surfaced as an empty note.
+ * Reads the "Mise à jour" tab's A2:B19 status block (see STATUS_*
+ * constants above) into a { equipe: statut } map. Rows with a blank club
+ * or blank status are skipped rather than surfaced as an empty note.
  */
-function readClubStatuses_(sheet) {
+function readClubStatuses_() {
+  var sheet = SpreadsheetApp.getActive().getSheetByName(SHEET_NAME_STATUS);
+  if (!sheet) return {};
+
   var numRows = STATUS_LAST_ROW - STATUS_FIRST_ROW + 1;
   var values = sheet.getRange(STATUS_FIRST_ROW, STATUS_COL_EQUIPE, numRows, 2).getValues();
   var byTeam = {};
