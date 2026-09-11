@@ -125,13 +125,21 @@ Gotchas:
 to wait on Apps Script's cold start (10-40s after the container's been idle).
 The frontend fetches from the Worker instead of Apps Script directly.
 
-Refreshing that cache is a **manual** step: the Sheet has a "⚡ Cache" menu
-with a "Rafraîchir maintenant" item (`refreshCacheNow_`/`onOpen` in
-`Code.gs`) the maintainer clicks after finishing a batch of edits, rather
-than something that fires automatically on every edit. `refreshFixtures`'s
-own (much narrower) revalidation call is unaffected — see its gotcha below
-for why that one stays automatic. This is deliberate, not a missing
-feature — see the first gotcha below for why.
+Refreshing that cache is a **manual** step, not something that fires
+automatically on every edit — this is deliberate, not a missing feature,
+see the first gotcha below for why. Two ways to trigger it, both doing the
+exact same full refresh:
+
+- A **"⚡ Cache" Sheet menu** with a "Rafraîchir maintenant" item
+  (`refreshCacheNow_`/`onOpen` in `Code.gs`) — desktop/web only, Apps
+  Script custom menus don't exist on the Sheets mobile app.
+- A **checkbox cell** in its own "⚡ Cache" tab (`onEditCacheTrigger_`/
+  `setupCacheRefreshTrigger` in `Code.gs`) — an ordinary spreadsheet edit,
+  so it works identically on mobile and desktop; tick the box, it
+  un-checks itself once the refresh is sent.
+
+`refreshFixtures`'s own (much narrower) revalidation call is unaffected —
+see its gotcha below for why that one stays automatic.
 
 Setup (once):
 
@@ -153,22 +161,27 @@ Then, one-time, populate the cache for every journée that already has data:
 curl -X POST "https://<your-worker>.workers.dev/__warm-all?secret=<REVALIDATE_SECRET>"
 ```
 
-And wire up the Apps Script side so the menu can actually reach the Worker —
-in the Apps Script editor:
+And wire up the Apps Script side so both triggers can actually reach the
+Worker — in the Apps Script editor:
 
 1. **Project Settings > Script Properties > Add script property**, twice:
    - `CACHE_WEBHOOK_URL` = `https://<your-worker>.workers.dev/__revalidate`
    - `CACHE_WEBHOOK_SECRET` = the exact same value passed to `wrangler secret put` above
 2. Reload the Sheet — the "⚡ Cache" menu (built by `onOpen`) appears
    automatically, no setup function to run.
-3. If this project previously had the old *automatic* per-edit trigger
+3. In the function dropdown, select `setupCacheRefreshTrigger` and click
+   **Run** once (grant the requested permissions — it needs to create a
+   tab and manage triggers). This creates the "⚡ Cache" tab/checkbox (if
+   missing) and installs the installable trigger the checkbox needs;
+   re-running later is safe.
+4. If this project previously had the old *automatic* per-edit trigger
    installed, run `removeCacheWebhookTrigger` once from the function
    dropdown to remove it — otherwise it keeps firing (harmlessly, since its
    handler function no longer exists) on every edit.
 
 Gotchas:
 
-- **Why this is a manual menu click, not automatic on every edit**:
+- **Why this is manual, not automatic on every edit**:
   Cloudflare's Workers KV free tier caps **1,000 "put" operations per day
   for the whole account** — shared with the sibling
   [`compos`](../compos) project's own Worker. Almost every edit here (any
@@ -205,10 +218,19 @@ Gotchas:
   the window against a cold Apps Script instance — an accepted,
   self-correcting degradation (the next click corrects it), not a bug.
 - **`refreshFixtures`'s own revalidation call stays automatic** (unlike the
-  manual menu above) — it's infrequent (every 6h) and already narrowly
-  targeted to just the gameweek(s) whose fixtures actually changed
+  manual menu/checkbox above) — it's infrequent (every 6h) and already
+  narrowly targeted to just the gameweek(s) whose fixtures actually changed
   (usually 1-4 journées, see `journeeLabelForGameweek_`), so it's a minor,
   bounded contributor to the daily put quota rather than the main risk.
+- **Why the checkbox exists at all, not just the menu**: Apps Script
+  custom menus (`onOpen`/`SpreadsheetApp.getUi()`) are a desktop/web-only
+  feature — they simply don't render on the Sheets mobile app, no
+  workaround for that specific UI. A checkbox cell is a plain spreadsheet
+  edit, which fires `onEdit` identically regardless of which client made
+  it, so it's the mobile-compatible equivalent. `onEditCacheTrigger_`
+  reads the checkbox's current value directly rather than trusting `e.value`
+  (which Apps Script only populates for single-cell edits), so it still
+  behaves correctly if a paste happens to land on that cell.
 - **KV writes can take up to ~60s to propagate** to Cloudflare edge
   locations other than the one that handled the revalidation webhook — an
   accepted, low-impact limitation, not something worth engineering around

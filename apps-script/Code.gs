@@ -170,25 +170,35 @@ function cacheSet_(key, value) {
 // waiting on this script's cold start. This notifies it when data changes
 // so it can proactively re-fetch and re-cache it.
 //
-// Deliberately MANUAL (a Sheet menu item), not automatic on every edit --
-// each revalidation costs one Workers KV "put" per journée it re-fetches,
-// and this project can't target which journée(s) a given edit actually
-// affects cheaply enough to matter: nearly every edit here (any identity
-// column, the per-club status tab) is embedded in EVERY journée's payload,
-// so a fully-automatic version would revalidate all 34 journées + meta
+// Deliberately MANUAL, not automatic on every edit -- each revalidation
+// costs one Workers KV "put" per journée it re-fetches, and this project
+// can't target which journée(s) a given edit actually affects cheaply
+// enough to matter: nearly every edit here (any identity column, the
+// per-club status tab) is embedded in EVERY journée's payload, so a
+// fully-automatic version would revalidate all 34 journées + meta
 // (35 puts) on close to every single edit. Cloudflare's free tier caps
 // Workers KV at 1,000 puts/day for the whole account -- shared with the
 // sibling compos project's own Worker -- and a maintainer updating several
 // players in one sitting blew through that in a single day. One deliberate
-// "refresh now" click after finishing a batch of edits still costs the
-// same 35 puts, but only once per session instead of once per edit.
+// manual refresh after finishing a batch of edits still costs the same 35
+// puts, but only once per session instead of once per edit.
+//
+// Two ways to trigger it, both doing the exact same full refresh:
+//   - A "⚡ Cache" Sheet menu (onOpen/refreshCacheNow_ below) -- desktop/web
+//     only, Apps Script custom menus don't exist on the Sheets mobile app.
+//   - A checkbox cell in its own "⚡ Cache" tab (onEditCacheTrigger_/
+//     setupCacheRefreshTrigger below) -- an ordinary spreadsheet edit, so
+//     it works identically on mobile and desktop.
 
 /**
  * Simple trigger — adds a "⚡ Cache" menu to the Sheet's UI on open, with
  * a single "Rafraîchir maintenant" item wired to refreshCacheNow_ below.
  * Building a menu itself needs no authorization (unlike onEdit, which is
  * why this doesn't also try to auto-refresh on open) -- only actually
- * clicking the item does, prompting for consent the first time.
+ * clicking the item does, prompting for consent the first time. Has no
+ * effect on the Sheets mobile app, which doesn't render Apps Script custom
+ * menus at all -- see onEditCacheTrigger_ below for the mobile-compatible
+ * equivalent.
  */
 function onOpen(e) {
   SpreadsheetApp.getUi()
@@ -212,11 +222,81 @@ function refreshCacheNow_() {
       'dans Project Settings > Script Properties, ou réessayez.');
 }
 
+// A checkbox cell, not a menu, so it also works on the Sheets mobile app
+// (see the comment block above). Its own tab, kept separate from the main
+// sheet, so an accidental tap/edit next to it can't collide with real data.
+var SHEET_NAME_CACHE_TRIGGER = '⚡ Cache';
+var CACHE_TRIGGER_CELL = 'B2';
+
+/**
+ * Creates the "⚡ Cache" tab (if missing) with a label and a checkbox in
+ * CACHE_TRIGGER_CELL, leaving the checkbox's current value alone if the
+ * tab already exists. Called by setupCacheRefreshTrigger below; also safe
+ * to call by hand if the tab or checkbox ever gets deleted by mistake.
+ */
+function getOrCreateCacheTriggerSheet_() {
+  var ss = SpreadsheetApp.getActive();
+  var sheet = ss.getSheetByName(SHEET_NAME_CACHE_TRIGGER);
+  if (!sheet) sheet = ss.insertSheet(SHEET_NAME_CACHE_TRIGGER);
+  sheet.getRange('A2').setValue('Cocher pour rafraîchir le cache (le calcul peut prendre ~30 secondes) :');
+  var box = sheet.getRange(CACHE_TRIGGER_CELL);
+  if (typeof box.getValue() !== 'boolean') {
+    box.insertCheckboxes();
+    box.setValue(false);
+  }
+  return sheet;
+}
+
+/**
+ * Installable-trigger counterpart to onEdit above — unlike a simple
+ * trigger, this runs with full authorization and can call UrlFetchApp (via
+ * notifyCacheWebhook_). Registered by setupCacheRefreshTrigger below. Only
+ * reacts to CACHE_TRIGGER_CELL in the "⚡ Cache" tab being checked; every
+ * other edit anywhere else in the spreadsheet is ignored, so this doesn't
+ * reintroduce automatic revalidation on ordinary data edits — see the
+ * comment block above for why that's the whole point. Reads the cell's
+ * current value directly (rather than trusting `e.value`, which Apps
+ * Script only populates for single-cell edits) so a multi-cell paste that
+ * happens to cover this cell is still handled correctly.
+ */
+function onEditCacheTrigger_(e) {
+  if (!e || !e.range) return;
+  var sheet = e.range.getSheet();
+  if (!sheet || sheet.getName() !== SHEET_NAME_CACHE_TRIGGER) return;
+  if (e.range.getA1Notation() !== CACHE_TRIGGER_CELL) return;
+
+  var box = sheet.getRange(CACHE_TRIGGER_CELL);
+  if (box.getValue() !== true) return; // only react to checking it, not unchecking
+
+  var ok = notifyCacheWebhook_(allKnownJournees_());
+  box.setValue(false); // script-driven write -- doesn't itself re-fire onEdit
+  SpreadsheetApp.getActiveSpreadsheet().toast(
+    ok ? 'Cache rafraîchi (jusqu\'à ~30 secondes pour se propager).' : 'Échec du rafraîchissement du cache.',
+    '⚡ Cache'
+  );
+}
+
+/**
+ * One-time setup: run this once from the Apps Script editor (select it in
+ * the function dropdown, click Run, grant the requested permissions) to
+ * create the "⚡ Cache" tab/checkbox if missing and install the
+ * installable trigger above. Re-running is safe — it removes any trigger
+ * it previously installed for onEditCacheTrigger_ first, so this never
+ * stacks up duplicates.
+ */
+function setupCacheRefreshTrigger() {
+  getOrCreateCacheTriggerSheet_();
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'onEditCacheTrigger_') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('onEditCacheTrigger_').forSpreadsheet(SpreadsheetApp.getActive()).onEdit().create();
+}
+
 /**
  * One-time cleanup: run this once from the Apps Script editor to remove
- * the old per-edit installable trigger from before the "⚡ Cache" menu
- * replaced it (see the comment block above) — it would otherwise keep
- * firing on every edit, pointing at a handler function that no longer
+ * the old per-edit installable trigger from before the "⚡ Cache" menu/
+ * checkbox replaced it (see the comment block above) — it would otherwise
+ * keep firing on every edit, pointing at a handler function that no longer
  * exists. Safe to run even if that trigger was already removed (no-op).
  */
 function removeCacheWebhookTrigger() {
