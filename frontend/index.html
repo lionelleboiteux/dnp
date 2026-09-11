@@ -69,6 +69,20 @@
     font-size: 1rem;
   }
   .status-line { color: var(--muted); font-size: 0.9rem; margin: 0.5rem 0 1rem; }
+  /* Freshness indicator for the currently-loaded journée's data (see
+     Code.gs's lastUpdatedIso_) — the label stays modest, the timestamp
+     itself is the part worth noticing so it's set apart in size/weight. */
+  .last-updated {
+    margin: 0 0 1.25rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .last-updated-time {
+    margin-left: 0.4rem;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--ink);
+  }
   .legend {
     display: flex;
     flex-wrap: wrap;
@@ -208,6 +222,8 @@
     </select>
   </div>
 
+  <p id="last-updated" class="last-updated"></p>
+
   <div class="legend">
     <span>✅ Disponible</span>
     <span>🟥 Suspendu</span>
@@ -264,6 +280,7 @@
   var select = document.getElementById('journee-select');
   var statusLine = document.getElementById('status-line');
   var teamGrid = document.getElementById('team-grid');
+  var lastUpdatedEl = document.getElementById('last-updated');
 
   function el(tag, attrs, children) {
     var e = document.createElement(tag);
@@ -373,6 +390,29 @@
     });
   }
 
+  // ISO datetime -> "dd/mm  HH:mm" in Europe/Paris, fr-FR locale (same
+  // timezone/locale convention used across the fantasy-coach.fr sites).
+  // null (no edit recorded yet, or an unparseable value) clears the display
+  // entirely rather than showing a broken timestamp.
+  function formatLastUpdated_(iso) {
+    var d = iso ? new Date(iso) : null;
+    if (!d || isNaN(d.getTime())) return null;
+    var parts = {};
+    new Intl.DateTimeFormat('fr-FR', {
+      timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false
+    }).formatToParts(d).forEach(function (p) { parts[p.type] = p.value; });
+    if (!parts.day || !parts.month || !parts.hour || !parts.minute) return null;
+    return parts.day + '/' + parts.month + '  ' + parts.hour + ':' + parts.minute;
+  }
+
+  function renderLastUpdated(iso) {
+    var formatted = formatLastUpdated_(iso);
+    lastUpdatedEl.innerHTML = '';
+    if (!formatted) return;
+    lastUpdatedEl.appendChild(el('span', { text: 'Dernière mise à jour :' }));
+    lastUpdatedEl.appendChild(el('span', { class: 'last-updated-time', text: formatted }));
+  }
+
   // Which journée is "current" only matters for whether to show `statut`
   // (see doc comment at the top of Code.gs) -- `fixture` now comes straight
   // off every ?journee= response, for any journée, so no separate fetch or
@@ -382,13 +422,15 @@
   function loadJournee(journee) {
     setStatus('Chargement…');
     teamGrid.innerHTML = '';
+    renderLastUpdated(null);
     var isCurrent = journee === currentJourneeLabel;
     fetch(API_BASE + '?journee=' + encodeURIComponent(journee))
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (data && data.error) throw new Error(data.error);
         setStatus('');
-        renderTeams(data, isCurrent);
+        renderTeams(data.equipes, isCurrent);
+        renderLastUpdated(data.lastUpdated);
       })
       .catch(function (err) {
         setStatus('');

@@ -11,7 +11,8 @@
  *   ?meta=1            -> ["Journée 1", "Journée 2", ..., "Journée 34"] (chronological;
  *                         the frontend decides which one is "current" via the
  *                         jeu-des-pronos API, not this list's order)
- *   ?journee=Journée 12 -> [{ equipe, statut, fixture, joueurs: [{nom, prenom, posteFin, raison, categorie, retourPrevu}] }]
+ *   ?journee=Journée 12 -> { equipes: [{ equipe, statut, fixture, joueurs: [{nom, prenom, posteFin, raison, categorie, retourPrevu}] }],
+ *                            lastUpdated: ISO datetime | null }
  *                         `statut` is a free-text per-club status note (see
  *                         readClubStatuses_ below) — it's a flat, unversioned
  *                         block the sheet maintainer overwrites each
@@ -27,6 +28,10 @@
  *                         that fetches from ma-api.ligue1.fr — never live on
  *                         this request path. Available for every journée,
  *                         not just the current one (unlike `statut` above).
+ *                         `lastUpdated` is when cacheVersion was last
+ *                         bumped (any edit to "Liste Joueur 26-27" or
+ *                         "Mise à jour", or a fixtures refresh) — see
+ *                         lastUpdatedIso_.
  *
  * Responses are cached in CacheService (script-wide, up to 6h) so repeat
  * requests skip the SpreadsheetApp reads entirely. The cache is invalidated
@@ -68,6 +73,19 @@ var STATUS_COL_TEXT = 2;
 // somehow doesn't trigger onEdit below.
 var CACHE_TTL_SECONDS = 21600;
 
+// Bump whenever doGet's *response shape* changes (a field added/removed/
+// renamed) -- distinct from cacheVersion (which tracks *data* changes via
+// onEdit/refreshFixtures). A code deploy alone doesn't touch cacheVersion,
+// so a journée whose cache entry happened to still be warm from before the
+// deploy would otherwise keep serving the old shape for up to
+// CACHE_TTL_SECONDS regardless of any code change (observed directly on
+// the sibling compos project when adding a `lastUpdated` field left one
+// still-warm journée serving a response with no `lastUpdated` at all, while
+// others had already expired/recomputed). Bumping this forces every entry
+// to recompute on the next request after a shape change, independent of
+// edits.
+var CACHE_SCHEMA_VERSION = 2;
+
 function doGet(e) {
   var journee = e.parameter.journee;
   var cacheKey = journee ? 'journee:' + journee : 'meta';
@@ -90,14 +108,15 @@ function doGet(e) {
     if (!cols) {
       return jsonResponse_({ error: 'Journée inconnue: ' + journee });
     }
-    payload = readUnavailablePlayers_(sheet, cols);
+    var equipes = readUnavailablePlayers_(sheet, cols);
     var statuses = readClubStatuses_();
     var targetGw = gameweekNumberFromJournee_(journee);
     var fixturesByEquipe = isNaN(targetGw) ? {} : readFixturesForGameweek_(targetGw);
-    payload.forEach(function (team) {
+    equipes.forEach(function (team) {
       team.statut = statuses[team.equipe] || '';
       team.fixture = fixturesByEquipe[team.equipe] || null;
     });
+    payload = { equipes: equipes, lastUpdated: lastUpdatedIso_() };
   }
 
   var json = JSON.stringify(payload);
@@ -130,12 +149,25 @@ function getCacheVersion_() {
   return v || '0';
 }
 
+// ISO timestamp of the last time cacheVersion was bumped (any edit to
+// "Liste Joueur 26-27" or "Mise à jour" via onEdit, or a fixtures refresh)
+// -- reusing cacheVersion's own millisecond stamp rather than something
+// like DriveApp's file-modified time, which would need a new OAuth scope
+// this project has never requested and could break the deployed web app
+// until re-authorized (see README's "executeAs: USER_DEPLOYING" gotcha for
+// the same class of problem). null before the very first edit this script
+// has ever seen.
+function lastUpdatedIso_() {
+  var v = parseInt(getCacheVersion_(), 10);
+  return v ? new Date(v).toISOString() : null;
+}
+
 function cacheGet_(key) {
-  return CacheService.getScriptCache().get('v' + getCacheVersion_() + ':' + key);
+  return CacheService.getScriptCache().get('s' + CACHE_SCHEMA_VERSION + ':v' + getCacheVersion_() + ':' + key);
 }
 
 function cacheSet_(key, value) {
-  CacheService.getScriptCache().put('v' + getCacheVersion_() + ':' + key, value, CACHE_TTL_SECONDS);
+  CacheService.getScriptCache().put('s' + CACHE_SCHEMA_VERSION + ':v' + getCacheVersion_() + ':' + key, value, CACHE_TTL_SECONDS);
 }
 
 // --- Cloudflare Worker cache webhook -------------------------------------
