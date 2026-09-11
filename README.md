@@ -162,7 +162,7 @@ in the Apps Script editor:
 2. Reload the Sheet — the "⚡ Cache" menu (built by `onOpen`) appears
    automatically, no setup function to run.
 3. If this project previously had the old *automatic* per-edit trigger
-   installed, run `removeCacheWebhookTrigger_` once from the function
+   installed, run `removeCacheWebhookTrigger` once from the function
    dropdown to remove it — otherwise it keeps firing (harmlessly, since its
    handler function no longer exists) on every edit.
 

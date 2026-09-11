@@ -219,7 +219,7 @@ function refreshCacheNow_() {
  * firing on every edit, pointing at a handler function that no longer
  * exists. Safe to run even if that trigger was already removed (no-op).
  */
-function removeCacheWebhookTrigger_() {
+function removeCacheWebhookTrigger() {
   ScriptApp.getProjectTriggers().forEach(function (t) {
     if (t.getHandlerFunction() === 'onEditCacheWebhook_') ScriptApp.deleteTrigger(t);
   });
