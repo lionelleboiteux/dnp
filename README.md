@@ -121,9 +121,11 @@ Gotchas:
 ### 2. Cloudflare Worker cache (edge caching in front of the Apps Script API)
 
 `worker/` is a small Cloudflare Worker that caches the Apps Script JSON API
-(`?meta=1` and `?journee=...`) in Workers KV, so an ordinary visit never has
-to wait on Apps Script's cold start (10-40s after the container's been idle).
-The frontend fetches from the Worker instead of Apps Script directly.
+(`?meta=1`, `?journee=...`, and `?risqueSuspension=...` — see
+[`suspensionsProchainJaune.html`](#notes) in Notes) in Workers KV, so an
+ordinary visit never has to wait on Apps Script's cold start (10-40s after
+the container's been idle). The frontend fetches from the Worker instead
+of Apps Script directly.
 
 Refreshing that cache is a **manual** step, not something that fires
 automatically on every edit — this is deliberate, not a missing feature,
@@ -271,6 +273,23 @@ either the Worker or Apps Script directly.)
 
 ## Notes
 
+- **`frontend/suspensionsProchainJaune.html`**: a second static page, added
+  as a filtered view of the same "Liste Joueur 26-27" data rather than a
+  new sibling project — the underlying columns (`Carton`, `Suivi
+  suspension`) aren't currently exposed by `?journee=`, so it needed a new
+  `doGet` endpoint (`?risqueSuspension=<journée>`, see
+  `readPlayersAtRiskOfSuspension_`/`findSuiviSuspensionColumn_` in
+  `Code.gs`), but reuses the *same* Apps Script deployment and Cloudflare
+  Worker rather than standing up a third Worker sharing the account-wide
+  KV write quota (see the Worker section's gotchas). Lists players either
+  already suspended for that journée (`Carton` = `"S"`) or about to be by
+  card accumulation (`Suivi suspension` = `4`) — thresholds are
+  `CARTON_SUSPENDED_VALUE`/`SUIVI_SUSPENSION_THRESHOLD` in `Code.gs`, not
+  hardcoded inline. Its own Worker cache entries (`risque:<journée>`) use a
+  bounded 6h TTL instead of the main journée/meta keys' proactive
+  push-on-refresh, since folding ~34 more keys into every "⚡ Cache" click
+  would double its KV write cost for a page that doesn't need the same
+  freshness guarantee.
 - **Caching**: two independent layers. `Code.gs`'s own `CacheService`
   (script-side, up to 6h, invalidated by bumping a version stamp on
   `onEdit`) protects `SpreadsheetApp` reads from repeat requests and

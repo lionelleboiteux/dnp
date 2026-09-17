@@ -3,25 +3,39 @@
  * JSON API backing l1.dnp.fantasy-coach.fr (apps-script/Code.gs).
  *
  * Routes:
- *   GET  /?journee=<name>   -> cached (or live-fetched+cached) journée payload
- *   GET  /?meta=1  or  /    -> cached (or live-fetched+cached) meta (journée list)
- *   POST /__revalidate      -> webhook, called from Code.gs on data changes:
- *                              re-fetches and overwrites KV for specific
- *                              journée(s) (always + "meta"). Requires the
- *                              X-Revalidate-Secret header.
- *   GET|POST /__warm-all    -> one-off admin command: populate KV for every
- *                              journée currently in ?meta=1. Same secret,
- *                              accepted as a header OR a ?secret= query
- *                              param so it's easy to curl by hand.
+ *   GET  /?journee=<name>          -> cached (or live-fetched+cached) journée payload
+ *   GET  /?meta=1  or  /           -> cached (or live-fetched+cached) meta (journée list)
+ *   GET  /?risqueSuspension=<name> -> cached (or live-fetched+cached) suspension-risk
+ *                                      payload for that journée (see
+ *                                      frontend/suspensionsProchainJaune.html) --
+ *                                      a bounded-TTL cache (see
+ *                                      RISQUE_CACHE_TTL_SECONDS), deliberately NOT
+ *                                      wired into /__revalidate or /__warm-all below:
+ *                                      folding its ~34 possible keys into every
+ *                                      manual "⚡ Cache" refresh (see Code.gs) would
+ *                                      double that refresh's KV write cost for a
+ *                                      low-traffic page that doesn't need the same
+ *                                      near-real-time freshness as the main journée
+ *                                      view -- a periodic lazy refresh is cheaper.
+ *   POST /__revalidate             -> webhook, called from Code.gs on data changes:
+ *                                      re-fetches and overwrites KV for specific
+ *                                      journée(s) (always + "meta"). Requires the
+ *                                      X-Revalidate-Secret header. Does NOT cover
+ *                                      risqueSuspension keys -- see above.
+ *   GET|POST /__warm-all           -> one-off admin command: populate KV for every
+ *                                      journée currently in ?meta=1. Same secret,
+ *                                      accepted as a header OR a ?secret= query
+ *                                      param so it's easy to curl by hand. Also
+ *                                      does NOT cover risqueSuspension keys.
  *
- * KV key scheme deliberately mirrors Code.gs's own doGet cache-key logic
- * exactly (`cacheKey = journee ? 'journee:'+journee : 'meta'`), so a
- * revalidate call for "Journée 12" overwrites precisely the key a real
- * ?journee=Journée 12 request reads -- never a blanket flush. Confirmed
- * directly against a live request that this Sheet's journée labels really
- * are the bare "Journée N" form (unlike compos's sibling project, whose
- * internal-vs-displayed journée strings differ) -- see Code.gs's
- * journeeLabelForGameweek_ for where that would matter here too.
+ * KV key scheme for /?journee=/?meta=1 deliberately mirrors Code.gs's own
+ * doGet cache-key logic exactly (`cacheKey = journee ? 'journee:'+journee :
+ * 'meta'`), so a revalidate call for "Journée 12" overwrites precisely the
+ * key a real ?journee=Journée 12 request reads -- never a blanket flush.
+ * Confirmed directly against a live request that this Sheet's journée
+ * labels really are the bare "Journée N" form (unlike compos's sibling
+ * project, whose internal-vs-displayed journée strings differ) -- see
+ * Code.gs's journeeLabelForGameweek_ for where that would matter here too.
  */
 
 const CORS_HEADERS = {
@@ -77,7 +91,17 @@ function originUrlFor(env, journee) {
     : env.APPS_SCRIPT_BASE + '?meta=1';
 }
 
+// 6h, matching Code.gs's own CACHE_TTL_SECONDS -- see the risqueSuspension
+// route's doc comment above for why this path uses a bounded TTL instead
+// of proactive push-on-edit like the main journée/meta keys.
+const RISQUE_CACHE_TTL_SECONDS = 21600;
+
 async function handleCachedProxy(url, env) {
+  const risque = url.searchParams.get('risqueSuspension');
+  if (risque) {
+    return handleCachedRisqueSuspension(risque, env);
+  }
+
   const journee = url.searchParams.get('journee');
   const key = cacheKeyForJournee(journee);
 
@@ -88,6 +112,19 @@ async function handleCachedProxy(url, env) {
 
   const json = await fetchOriginJsonWithRetry(originUrlFor(env, journee), 3, 2000, 30000);
   await env.CACHE.put(key, json);
+  return jsonPayload(json, { 'X-Cache': 'MISS' });
+}
+
+async function handleCachedRisqueSuspension(risque, env) {
+  const key = 'risque:' + risque;
+  const cached = await env.CACHE.get(key);
+  if (cached !== null) {
+    return jsonPayload(cached, { 'X-Cache': 'HIT' });
+  }
+
+  const originUrl = env.APPS_SCRIPT_BASE + '?risqueSuspension=' + encodeURIComponent(risque);
+  const json = await fetchOriginJsonWithRetry(originUrl, 3, 2000, 30000);
+  await env.CACHE.put(key, json, { expirationTtl: RISQUE_CACHE_TTL_SECONDS });
   return jsonPayload(json, { 'X-Cache': 'MISS' });
 }
 

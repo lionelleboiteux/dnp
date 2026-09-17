@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Risque de Suspension Ligue 1 par Journée | Fantasy Coach</title>
+<meta name="description" content="Risque de suspension en Ligue 1, journée par journée : joueurs déjà sous le coup d'une suspension (carton) ou proches du seuil d'accumulation de cartons.">
+<link rel="canonical" href="https://l1.dnp.fantasy-coach.fr/suspensionsProchainJaune.html">
+<link rel="icon" type="image/png" href="https://static.wixstatic.com/media/449182_b075115d95e54908bebcaaef43561929~mv2.png/v1/fill/w_64,h_64,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/newlogo.png">
+<meta name="robots" content="index, follow">
+<!-- Shared nav/ads/feedback/analytics components — see https://github.com/lionelleboiteux/fc-shared -->
+<script src="https://cdn.jsdelivr.net/gh/lionelleboiteux/fc-shared@main/nav.js" defer></script>
+<script src="https://cdn.jsdelivr.net/gh/lionelleboiteux/fc-shared@main/ads.js" async></script>
+<script src="https://cdn.jsdelivr.net/gh/lionelleboiteux/fc-shared@main/feedback.js" defer></script>
+<script src="https://cdn.jsdelivr.net/gh/lionelleboiteux/fc-shared@main/ga.js" async></script>
+<script src="https://cdn.jsdelivr.net/gh/lionelleboiteux/fc-shared@main/pageview.js" data-project="dnp" async></script>
+<style>
+  :root {
+    /* Same palette as index.html so this reads as part of the same site. */
+    --fc-blue: #3d9be9;
+    --fc-blue-light: #63b0ee;
+    --bg: #ffffff;
+    --card: #ffffff;
+    --ink: #1c1917;
+    --muted: #6b6560;
+    --border: #d6d3d1;
+    --accent: var(--fc-blue);
+    --accent-ink: #ffffff;
+    --warn: #dc2626;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 0 1rem 1rem;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.5;
+  }
+  .site-footer { text-align: center; font-size: 0.8rem; color: var(--muted); margin: 2.5rem 0 1rem; }
+  main { max-width: 960px; margin: 0 auto; }
+  h1 { font-size: 1.4rem; margin: 0.5rem 0 1rem; }
+  .intro { margin-bottom: 1.25rem; }
+  .intro p { margin: 0.5rem 0; }
+  .journee-picker { margin-bottom: 1.5rem; }
+  .journee-picker label { display: block; font-weight: 600; margin-bottom: 0.4rem; }
+  .journee-picker select {
+    width: 100%;
+    max-width: 320px;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--ink);
+    font-size: 1rem;
+  }
+  .status-line { color: var(--muted); font-size: 0.9rem; margin: 0.5rem 0 1rem; }
+  /* Freshness indicator — same pattern as index.html's, sourced from the
+     same lastUpdated field (see Code.gs's doGet ?risqueSuspension= docs). */
+  .last-updated {
+    margin: 0 0 1.25rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .last-updated-time {
+    margin-left: 0.4rem;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .team-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .team-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.9rem 1rem 1rem;
+  }
+  .team-card h2 {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem 0.55rem;
+    font-size: 1.05rem;
+    margin: 0 0 0.6rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--warn);
+  }
+  .team-logo {
+    flex: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    object-fit: contain;
+  }
+  .team-logo-fallback {
+    flex: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--accent-ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.68rem;
+    font-weight: 700;
+  }
+  /* poste | name | raison -- simpler than index.html's 5-column layout
+     since there's no icon/emoji column here: `raison` is already a
+     ready-to-display French label (see Code.gs's readPlayersAtRiskOfSuspension_). */
+  .player-row {
+    display: grid;
+    grid-template-columns: 3.25rem minmax(0, 1.2fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.9rem;
+  }
+  .player-row:last-child { border-bottom: none; }
+  .player-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .player-poste {
+    justify-self: start;
+    background: #eaf3fc;
+    color: var(--fc-blue);
+    font-weight: 700;
+    font-size: 0.72rem;
+    text-align: center;
+    padding: 0.15rem 0;
+    border-radius: 5px;
+    width: 2.75rem;
+  }
+  .player-raison {
+    color: var(--warn);
+    font-weight: 600;
+    font-size: 0.82rem;
+    text-align: right;
+  }
+  .empty-state, .error-state {
+    text-align: center;
+    color: var(--muted);
+    padding: 2rem 1rem;
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+  }
+  .error-state { color: #b91c1c; }
+</style>
+</head>
+<body>
+<fc-nav current="dnp"></fc-nav>
+
+<main id="app">
+  <h1>Risque de suspension — Ligue 1</h1>
+  <div class="intro">
+    <p>Choisissez une journée pour voir, équipe par équipe, quels joueurs risquent d'être suspendus : déjà sous le coup d'une suspension pour cette journée (carton), ou proches du seuil d'accumulation de cartons (suivi suspension).</p>
+  </div>
+
+  <div class="journee-picker">
+    <label for="journee-select">Journée</label>
+    <select id="journee-select" disabled>
+      <option>Chargement…</option>
+    </select>
+  </div>
+
+  <p id="last-updated" class="last-updated"></p>
+
+  <p id="status-line" class="status-line"></p>
+  <div id="team-grid" class="team-grid"></div>
+  <noscript><p>Activez JavaScript pour afficher les joueurs à risque de suspension.</p></noscript>
+
+  <fc-feedback project="DNP"></fc-feedback>
+</main>
+
+<footer class="site-footer">&copy;2026 by Fantasy Coach.</footer>
+
+<script>
+(function () {
+  // ?api=<url> overrides the default for local/dev testing only; never
+  // persisted, so production use is unaffected. Same convention as
+  // index.html's.
+  var API_BASE = new URLSearchParams(location.search).get('api') ||
+    'https://dnp-l1-cache.fantasycoachfr.workers.dev';
+
+  var select = document.getElementById('journee-select');
+  var statusLine = document.getElementById('status-line');
+  var teamGrid = document.getElementById('team-grid');
+  var lastUpdatedEl = document.getElementById('last-updated');
+
+  function el(tag, attrs, children) {
+    var e = document.createElement(tag);
+    for (var k in (attrs || {})) {
+      if (k === 'text') e.textContent = attrs[k];
+      else e.setAttribute(k, attrs[k]);
+    }
+    (children || []).forEach(function (c) { e.appendChild(c); });
+    return e;
+  }
+
+  function setStatus(text) {
+    statusLine.textContent = text || '';
+  }
+
+  // Same map as index.html's TEAM_LOGOS -- duplicated rather than shared,
+  // matching this repo's convention of each page being fully self-contained
+  // (see README: no build step, no shared frontend JS module).
+  var TEAM_LOGOS = {
+    'Angers': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_4_37_512x512_b5149d8c4312c158b2975298205510eb.png',
+    'Auxerre': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_4_2_512x512_4bed22ddd777a8b0977284bee7f416a7.png',
+    'Brest': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_44_512x512_b8930455bc938de7b9f4e128e1036989.png',
+    'Le Havre': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_5_512x512_e9bf970697e022dcbd3d51e245f3682d.png',
+    'Lens': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2026_1_6_512x512_d08b45acce8a87d13b938cde8974362f.png',
+    'Lille': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_158_512x512_39a605746d9cf4eb12d9cd4f63adb27c.png',
+    'Lorient': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_7_512x512_7d0c497c5f41d0dcf5dabad2910699e3.png',
+    'Lyon': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_159_512x512_1a9c2cd8f58fba433bb5cd568b3de7d0.png',
+    'Marseille': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2025_1_1_512x512_16ca4f08072a6b6d99169ba2b6a8b228.png',
+    'Monaco': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_9_512x512_ad7dd146950eee8eb68ea9588a674fe8.png',
+    'Nice': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_30_512x512_2ccb89a2f1fbad23e693d1c5d101a25d.png',
+    'Paris FC': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_4_90_512x512_8b2bb52cf67eb9456c794509c7e58c46.png',
+    'Paris SG': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_13_512x512_4a9438034a011c1368c52d097a93b98f.png',
+    'Rennes': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_14_512x512_28c7492293ca34c6e26d6cb71e858a57.png',
+    'Strasbourg': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_15_512x512_e9553990e86d8098a3cf94febe8b4b96.png',
+    'Toulouse': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_16_512x512_a7be4e575396227614acc0ed47083503.png',
+    'Troyes': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_4_33_512x512_fa84337aa111aaf34990dd2590ba1789.png',
+    'Estac Troyes': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_4_33_512x512_fa84337aa111aaf34990dd2590ba1789.png',
+    'Le Mans': 'https://s3.eu-west-1.amazonaws.com/image.mpg/daabb8d9-230e-4fe2-8214-682fbbdedb5e',
+    'Le Mans FC': 'https://s3.eu-west-1.amazonaws.com/image.mpg/daabb8d9-230e-4fe2-8214-682fbbdedb5e'
+  };
+
+  function teamInitials(equipe) {
+    return String(equipe || '?')
+      .split(/\s+/)
+      .map(function (w) { return w[0]; })
+      .join('')
+      .slice(0, 3)
+      .toUpperCase();
+  }
+
+  function formatPlayerName(prenom, nom) {
+    var initial = String(prenom || '').trim().charAt(0);
+    return String(nom || '').trim() + (initial ? ' ' + initial + '.' : '');
+  }
+
+  function renderTeams(teams) {
+    teamGrid.innerHTML = '';
+    if (!teams || teams.length === 0) {
+      teamGrid.appendChild(el('div', { class: 'empty-state', text: 'Aucun joueur à risque de suspension pour cette journée.' }));
+      return;
+    }
+    teams.forEach(function (team) {
+      var card = el('div', { class: 'team-card' });
+      var heading = el('h2', {});
+      var logoUrl = TEAM_LOGOS[team.equipe];
+      if (logoUrl) {
+        var logo = el('img', { class: 'team-logo', src: logoUrl, alt: team.equipe });
+        logo.addEventListener('error', function () {
+          this.replaceWith(el('span', { class: 'team-logo-fallback', text: teamInitials(team.equipe) }));
+        });
+        heading.appendChild(logo);
+      } else {
+        heading.appendChild(el('span', { class: 'team-logo-fallback', text: teamInitials(team.equipe) }));
+      }
+      heading.appendChild(el('span', { text: team.equipe }));
+      card.appendChild(heading);
+      team.joueurs.forEach(function (j) {
+        var row = el('div', { class: 'player-row' });
+        row.appendChild(el('span', { class: 'player-poste', text: j.posteFin || '' }));
+        row.appendChild(el('span', { class: 'player-name', text: formatPlayerName(j.prenom, j.nom) }));
+        row.appendChild(el('span', { class: 'player-raison', text: j.raison || '' }));
+        card.appendChild(row);
+      });
+      teamGrid.appendChild(card);
+    });
+  }
+
+  // ISO datetime -> "dd/mm  HH:mm" in Europe/Paris, fr-FR locale -- same
+  // formatting as index.html's formatLastUpdated_.
+  function formatLastUpdated_(iso) {
+    var d = iso ? new Date(iso) : null;
+    if (!d || isNaN(d.getTime())) return null;
+    var parts = {};
+    new Intl.DateTimeFormat('fr-FR', {
+      timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false
+    }).formatToParts(d).forEach(function (p) { parts[p.type] = p.value; });
+    if (!parts.day || !parts.month || !parts.hour || !parts.minute) return null;
+    return parts.day + '/' + parts.month + '  ' + parts.hour + ':' + parts.minute;
+  }
+
+  function renderLastUpdated(iso) {
+    var formatted = formatLastUpdated_(iso);
+    lastUpdatedEl.innerHTML = '';
+    if (!formatted) return;
+    lastUpdatedEl.appendChild(el('span', { text: 'Dernière mise à jour :' }));
+    lastUpdatedEl.appendChild(el('span', { class: 'last-updated-time', text: formatted }));
+  }
+
+  function loadJournee(journee) {
+    setStatus('Chargement…');
+    teamGrid.innerHTML = '';
+    renderLastUpdated(null);
+    fetch(API_BASE + '?risqueSuspension=' + encodeURIComponent(journee))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data && data.error) throw new Error(data.error);
+        setStatus('');
+        renderTeams(data.equipes);
+        renderLastUpdated(data.lastUpdated);
+      })
+      .catch(function (err) {
+        setStatus('');
+        teamGrid.appendChild(el('div', { class: 'error-state', text: 'Impossible de charger les données (' + err.message + ').' }));
+      });
+  }
+
+  // jeu-des-pronos already tracks which Ligue 1 gameweek is current (locks
+  // open/close around kickoffs); same source index.html uses to default
+  // its own journée picker.
+  var PRONOS_API_BASE = 'https://dmytkubjxwwwkroutvdu.supabase.co/functions/v1/api';
+  var PRONOS_L1_LEAGUE_ID = '27f27a15-02a9-448a-98d5-80998e2fa52e';
+
+  function fetchCurrentGameweekNumber() {
+    return fetch(PRONOS_API_BASE + '/v1/leagues/' + PRONOS_L1_LEAGUE_ID + '/current')
+      .then(function (r) { return r.json(); })
+      .then(function (data) { return data && data.gameweek ? data.gameweek.number : null; })
+      .catch(function () { return null; });
+  }
+
+  Promise.all([
+    fetch(API_BASE + '?meta=1').then(function (r) { return r.json(); }),
+    fetchCurrentGameweekNumber()
+  ])
+    .then(function (results) {
+      var journees = results[0];
+      var currentNumber = results[1];
+      select.innerHTML = '';
+      journees.forEach(function (j) {
+        select.appendChild(el('option', { value: j, text: j }));
+      });
+      select.disabled = false;
+      select.addEventListener('change', function () { loadJournee(select.value); });
+
+      var currentJournee = currentNumber != null ? 'Journée ' + currentNumber : null;
+      var defaultJournee = (currentJournee && journees.indexOf(currentJournee) !== -1)
+        ? currentJournee
+        : (journees.length ? journees[0] : null);
+      if (defaultJournee) {
+        select.value = defaultJournee;
+        loadJournee(defaultJournee);
+      }
+    })
+    .catch(function (err) {
+      select.innerHTML = '';
+      select.appendChild(el('option', { text: 'Erreur de chargement' }));
+      teamGrid.appendChild(el('div', { class: 'error-state', text: 'Impossible de charger la liste des journées (' + err.message + ').' }));
+    });
+})();
+</script>
+</body>
+</html>

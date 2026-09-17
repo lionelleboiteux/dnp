@@ -32,6 +32,19 @@
  *                         bumped (any edit to "Liste Joueur 26-27" or
  *                         "Mise à jour", or a fixtures refresh) — see
  *                         lastUpdatedIso_.
+ *   ?risqueSuspension=Journée 5 -> { equipes: [{ equipe, joueurs: [{nom, prenom, posteFin, raison}] }],
+ *                         lastUpdated: ISO datetime | null }
+ *                         Players at risk of being suspended for that
+ *                         gameweek: the Journée's Carton column reads
+ *                         CARTON_SUSPENDED_VALUE ("S", already suspended
+ *                         for it) OR the single, fixed "Suivi suspension"
+ *                         tracking column (found by header text, not a
+ *                         hardcoded column — see findSuiviSuspensionColumn_)
+ *                         reads SUIVI_SUSPENSION_THRESHOLD (4, about to be
+ *                         suspended by card accumulation). `raison` is a
+ *                         short French label saying which (or both) —
+ *                         see readPlayersAtRiskOfSuspension_. Powers
+ *                         frontend/suspensionsProchainJaune.html.
  *
  * Responses are cached in CacheService (script-wide, up to 6h) so repeat
  * requests skip the SpreadsheetApp reads entirely. The cache is invalidated
@@ -69,6 +82,18 @@ var STATUS_LAST_ROW = 19;
 var STATUS_COL_EQUIPE = 1;
 var STATUS_COL_TEXT = 2;
 
+// Suspension-risk endpoint (see doGet's ?risqueSuspension= docs above and
+// readPlayersAtRiskOfSuspension_/findSuiviSuspensionColumn_ below).
+// SUIVI_SUSPENSION_HEADER is looked up by header text each time rather
+// than a hardcoded column number (confirmed live at col 136 on 2026-09-17,
+// but that shifts if columns are ever inserted/removed before it) — do
+// NOT match on "suspension" alone, "Journée de suspension" a few columns
+// over also contains that word but holds unrelated data (confirmed via
+// debugUpcomingSuspensions, which matched the wrong one on a first pass).
+var CARTON_SUSPENDED_VALUE = 'S';
+var SUIVI_SUSPENSION_HEADER = 'Suivi suspension';
+var SUIVI_SUSPENSION_THRESHOLD = 4;
+
 // CacheService's own cap; also used as a safety-net TTL in case an edit
 // somehow doesn't trigger onEdit below.
 var CACHE_TTL_SECONDS = 21600;
@@ -88,7 +113,9 @@ var CACHE_SCHEMA_VERSION = 2;
 
 function doGet(e) {
   var journee = e.parameter.journee;
-  var cacheKey = journee ? 'journee:' + journee : 'meta';
+  var risqueSuspension = e.parameter.risqueSuspension;
+  var cacheKey = risqueSuspension ? 'risque:' + risqueSuspension
+    : (journee ? 'journee:' + journee : 'meta');
 
   var cached = cacheGet_(cacheKey);
   if (cached !== null) {
@@ -99,7 +126,16 @@ function doGet(e) {
   var journeeMap = buildJourneeColumnMap_(sheet);
 
   var payload;
-  if (!journee) {
+  if (risqueSuspension) {
+    var riskCols = journeeMap[risqueSuspension];
+    if (!riskCols) {
+      return jsonResponse_({ error: 'Journée inconnue: ' + risqueSuspension });
+    }
+    payload = {
+      equipes: readPlayersAtRiskOfSuspension_(sheet, riskCols.mn - 1),
+      lastUpdated: lastUpdatedIso_()
+    };
+  } else if (!journee) {
     // Object key order is insertion order, i.e. chronological (left-to-right
     // in the sheet) — see buildJourneeColumnMap_.
     payload = Object.keys(journeeMap);
@@ -415,6 +451,77 @@ function readUnavailablePlayers_(sheet, cols) {
   return Object.keys(byTeam).sort().map(function (equipe) {
     return { equipe: equipe, joueurs: byTeam[equipe] };
   });
+}
+
+/**
+ * Players at risk of suspension for one journée: Carton reads
+ * CARTON_SUSPENDED_VALUE (already suspended for it) OR the "Suivi
+ * suspension" column reads SUIVI_SUSPENSION_THRESHOLD (about to be
+ * suspended by accumulation) -- see doGet's ?risqueSuspension= docs above.
+ * `raison` names which one(s) matched, in French, so the frontend can
+ * display it as-is without knowing the underlying rule.
+ */
+function readPlayersAtRiskOfSuspension_(sheet, cartonCol) {
+  var lastRow = sheet.getLastRow();
+  var numRows = lastRow - FIRST_DATA_ROW + 1;
+  if (numRows <= 0) return [];
+
+  var suiviCol = findSuiviSuspensionColumn_(sheet);
+
+  var identity = sheet.getRange(FIRST_DATA_ROW, 1, numRows, COL_POSTE_FIN).getValues();
+  var carton = sheet.getRange(FIRST_DATA_ROW, cartonCol, numRows, 1).getValues();
+  var suivi = suiviCol ? sheet.getRange(FIRST_DATA_ROW, suiviCol, numRows, 1).getValues() : null;
+
+  var byTeam = {};
+  for (var i = 0; i < numRows; i++) {
+    var nom = identity[i][COL_NOM - 1];
+    var equipe = identity[i][COL_EQUIPE - 1];
+    if (!nom || !equipe) continue; // skip malformed/incomplete rows
+
+    var cartonVal = String(carton[i][0] || '').trim();
+    var suiviVal = suivi ? suivi[i][0] : null;
+    var viaCarton = cartonVal === CARTON_SUSPENDED_VALUE;
+    var viaSuivi = suivi !== null && Number(suiviVal) === SUIVI_SUSPENSION_THRESHOLD;
+    if (!viaCarton && !viaSuivi) continue;
+
+    var raisons = [];
+    if (viaCarton) raisons.push('Carton');
+    if (viaSuivi) raisons.push('Suivi suspension (' + suiviVal + ')');
+
+    var player = {
+      nom: nom,
+      prenom: identity[i][COL_PRENOM - 1],
+      posteFin: identity[i][COL_POSTE_FIN - 1],
+      raison: raisons.join(' + ')
+    };
+
+    if (!byTeam[equipe]) byTeam[equipe] = [];
+    byTeam[equipe].push(player);
+  }
+
+  return Object.keys(byTeam).sort().map(function (equipe) {
+    return { equipe: equipe, joueurs: byTeam[equipe] };
+  });
+}
+
+// Locates the single, fixed "Suivi suspension" column by exact header
+// match in row 1 or 2 (same rows buildJourneeColumnMap_ already reads for
+// the per-journée groups) rather than a hardcoded column number, since
+// it's outside those groups and could shift if columns are ever
+// inserted/removed before it. Returns null if the header is ever renamed
+// or removed -- callers then skip the "Suivi suspension" half of the
+// check rather than erroring, so Carton-based results still come through.
+function findSuiviSuspensionColumn_(sheet) {
+  var lastCol = sheet.getLastColumn();
+  var row1 = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var row2 = sheet.getRange(2, 1, 1, lastCol).getValues()[0];
+  for (var c = 0; c < lastCol; c++) {
+    if (String(row1[c] || '').trim() === SUIVI_SUSPENSION_HEADER ||
+        String(row2[c] || '').trim() === SUIVI_SUSPENSION_HEADER) {
+      return c + 1;
+    }
+  }
+  return null;
 }
 
 /**
