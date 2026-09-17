@@ -91,6 +91,7 @@ var STATUS_COL_TEXT = 2;
 // over also contains that word but holds unrelated data (confirmed via
 // debugUpcomingSuspensions, which matched the wrong one on a first pass).
 var CARTON_SUSPENDED_VALUE = 'S';
+var CARTON_SUSPENDED_LABEL = 'En sursis après un rouge';
 var SUIVI_SUSPENSION_HEADER = 'Suivi suspension';
 var SUIVI_SUSPENSION_THRESHOLD = 4;
 
@@ -485,7 +486,7 @@ function readPlayersAtRiskOfSuspension_(sheet, cartonCol) {
     if (!viaCarton && !viaSuivi) continue;
 
     var raisons = [];
-    if (viaCarton) raisons.push('Carton');
+    if (viaCarton) raisons.push(CARTON_SUSPENDED_LABEL);
     if (viaSuivi) raisons.push('Suivi suspension (' + suiviVal + ')');
 
     var player = {
