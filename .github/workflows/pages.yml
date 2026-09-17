@@ -1,15 +1,18 @@
 name: Deploy site to Pages
 
 # Hosts the "joueurs indisponibles" static page (frontend/index.html) at the
-# site root. Same shape as pronos.fantasy-coach.fr's pages.yml: this is a
-# static-only site (data comes from the Apps Script Web App at runtime, not
-# from anything built here), so the workflow just assembles and deploys.
+# site root, plus the suspension-risk page
+# (frontend/suspensionsProchainJaune.html) alongside it. Same shape as
+# pronos.fantasy-coach.fr's pages.yml: this is a static-only site (data
+# comes from the Apps Script Web App at runtime, not from anything built
+# here), so the workflow just assembles and deploys.
 
 on:
   push:
     branches: [main]
     paths:
       - 'frontend/index.html'
+      - 'frontend/suspensionsProchainJaune.html'
       - 'frontend/ads.txt'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
@@ -34,6 +37,7 @@ jobs:
         run: |
           mkdir -p _site
           cp frontend/index.html _site/index.html
+          cp frontend/suspensionsProchainJaune.html _site/suspensionsProchainJaune.html
           cp frontend/ads.txt _site/ads.txt
           # Custom domain (DNS: l1.dnp.fantasy-coach.fr CNAME <github-user>.github.io).
           # Must be re-written on every deploy — GitHub Pages drops the custom
