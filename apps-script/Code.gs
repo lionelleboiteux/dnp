@@ -100,8 +100,10 @@ var SUIVI_SUSPENSION_THRESHOLD = 4;
 var CACHE_TTL_SECONDS = 21600;
 
 // Bump whenever doGet's *response shape* changes (a field added/removed/
-// renamed) -- distinct from cacheVersion (which tracks *data* changes via
-// onEdit/refreshFixtures). A code deploy alone doesn't touch cacheVersion,
+// renamed) or any other change to what a request returns for otherwise
+// unchanged sheet data (e.g. a new sort order) -- distinct from
+// cacheVersion (which tracks *data* changes via onEdit/refreshFixtures).
+// A code deploy alone doesn't touch cacheVersion,
 // so a journée whose cache entry happened to still be warm from before the
 // deploy would otherwise keep serving the old shape for up to
 // CACHE_TTL_SECONDS regardless of any code change (observed directly on
@@ -110,7 +112,7 @@ var CACHE_TTL_SECONDS = 21600;
 // others had already expired/recomputed). Bumping this forces every entry
 // to recompute on the next request after a shape change, independent of
 // edits.
-var CACHE_SCHEMA_VERSION = 2;
+var CACHE_SCHEMA_VERSION = 3;
 
 function doGet(e) {
   var journee = e.parameter.journee;
@@ -450,7 +452,14 @@ function readUnavailablePlayers_(sheet, cols) {
   }
 
   return Object.keys(byTeam).sort().map(function (equipe) {
-    return { equipe: equipe, joueurs: byTeam[equipe] };
+    // Unavailable ("out": blessure/suspendu/personnel/hors_groupe/transfert)
+    // first, then incertain, then disponible last -- Array#sort is stable
+    // in the V8 runtime Apps Script uses, so players within the same
+    // category keep their original (sheet row) order.
+    var joueurs = byTeam[equipe].sort(function (a, b) {
+      return categorySortRank_(a.categorie) - categorySortRank_(b.categorie);
+    });
+    return { equipe: equipe, joueurs: joueurs };
   });
 }
 
@@ -556,6 +565,17 @@ function classify_(text, bgColor) {
   if (normalized === 'Personnel' || sameColor_(bgColor, COLOR_PERSONAL)) return 'personnel';
   if (sameColor_(bgColor, COLOR_INJURED)) return 'blessure';
   return 'incertain';
+}
+
+// Display order for readUnavailablePlayers_'s per-team player list: every
+// "out" category (blessure/suspendu/personnel/hors_groupe/transfert) before
+// incertain, and incertain before disponible. Ranks, not a fixed list of
+// named categories, so any category classify_ doesn't return a case for
+// above still sorts as "out" (rank 0) rather than needing its own entry.
+function categorySortRank_(categorie) {
+  if (categorie === 'incertain') return 1;
+  if (categorie === 'disponible') return 2;
+  return 0;
 }
 
 function sameColor_(a, b) {
