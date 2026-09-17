@@ -42,18 +42,6 @@
   h1 { font-size: 1.4rem; margin: 0.5rem 0 1rem; }
   .intro { margin-bottom: 1.25rem; }
   .intro p { margin: 0.5rem 0; }
-  .journee-picker { margin-bottom: 1.5rem; }
-  .journee-picker label { display: block; font-weight: 600; margin-bottom: 0.4rem; }
-  .journee-picker select {
-    width: 100%;
-    max-width: 320px;
-    padding: 0.55rem 0.7rem;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--card);
-    color: var(--ink);
-    font-size: 1rem;
-  }
   .status-line { color: var(--muted); font-size: 0.9rem; margin: 0.5rem 0 1rem; }
   /* Freshness indicator — same pattern as index.html's, sourced from the
      same lastUpdated field (see Code.gs's doGet ?risqueSuspension= docs). */
@@ -159,13 +147,6 @@
     <p>Équipe par équipe, quels joueurs risquent d'être suspendus : en sursis après une suspension, ou proches du seuil d'accumulation de cartons.</p>
   </div>
 
-  <div class="journee-picker">
-    <label for="journee-select">Journée</label>
-    <select id="journee-select" disabled>
-      <option>Chargement…</option>
-    </select>
-  </div>
-
   <p id="last-updated" class="last-updated"></p>
 
   <p id="status-line" class="status-line"></p>
@@ -185,7 +166,6 @@
   var API_BASE = new URLSearchParams(location.search).get('api') ||
     'https://dnp-l1-cache.fantasycoachfr.workers.dev';
 
-  var select = document.getElementById('journee-select');
   var statusLine = document.getElementById('status-line');
   var teamGrid = document.getElementById('team-grid');
   var lastUpdatedEl = document.getElementById('last-updated');
@@ -328,6 +308,10 @@
       .catch(function () { return null; });
   }
 
+  // No picker on this page (unlike index.html) -- always shows the
+  // current/upcoming gameweek, still resolved the same way (?meta=1 +
+  // jeu-des-pronos current gameweek, falling back to the first known
+  // journée if that lookup fails or the computed label isn't in the list).
   Promise.all([
     fetch(API_BASE + '?meta=1').then(function (r) { return r.json(); }),
     fetchCurrentGameweekNumber()
@@ -335,25 +319,18 @@
     .then(function (results) {
       var journees = results[0];
       var currentNumber = results[1];
-      select.innerHTML = '';
-      journees.forEach(function (j) {
-        select.appendChild(el('option', { value: j, text: j }));
-      });
-      select.disabled = false;
-      select.addEventListener('change', function () { loadJournee(select.value); });
 
       var currentJournee = currentNumber != null ? 'Journée ' + currentNumber : null;
       var defaultJournee = (currentJournee && journees.indexOf(currentJournee) !== -1)
         ? currentJournee
         : (journees.length ? journees[0] : null);
       if (defaultJournee) {
-        select.value = defaultJournee;
         loadJournee(defaultJournee);
+      } else {
+        teamGrid.appendChild(el('div', { class: 'error-state', text: 'Impossible de déterminer la journée actuelle.' }));
       }
     })
     .catch(function (err) {
-      select.innerHTML = '';
-      select.appendChild(el('option', { text: 'Erreur de chargement' }));
       teamGrid.appendChild(el('div', { class: 'error-state', text: 'Impossible de charger la liste des journées (' + err.message + ').' }));
     });
 })();
