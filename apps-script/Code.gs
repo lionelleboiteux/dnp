@@ -131,7 +131,7 @@ var CACHE_TTL_SECONDS = 21600;
 // others had already expired/recomputed). Bumping this forces every entry
 // to recompute on the next request after a shape change, independent of
 // edits.
-var CACHE_SCHEMA_VERSION = 6;
+var CACHE_SCHEMA_VERSION = 7;
 
 function doGet(e) {
   if (e.parameter.matchsSelection) {
@@ -694,18 +694,27 @@ function normalizedCountryLookup_() {
  * fixtures by (e.g. "Côte d’Ivoire — espoir", "France", "Gabon"). Returns
  * null if the base country isn't found even after normalizing (shouldn't
  * happen for any value actually seen in the sheet as of 2026-09-21, but
- * defensive against a typo or a genuinely new country) -- callers then
- * just show no fixtures for that player rather than erroring.
+ * defensive against a typo or a genuinely new country), OR if the
+ * selection is a specific numbered youth age group (U16-U21) rather than
+ * the literal senior/Espoirs teams -- callers then just show no fixtures
+ * for that player rather than showing the wrong team's games.
  *
- * "Selections fixtures" doesn't distinguish youth levels (no separate
- * U17/U20/Espoirs rows per country, just one "— espoir" bucket per
- * country) -- so ANY espoir-type suffix maps to that same bucket, not a
- * level-specific lookup.
+ * "Selections fixtures" only has ONE youth bucket per country ("— espoir",
+ * i.e. the Espoirs/U21-equivalent team) -- confirmed live 2026-09-21 that
+ * "Sélection" values like "France U20"/"France U19"/"France U18" are
+ * real, DISTINCT age groups from "France Espoir", not just alternate
+ * spellings of the same team (that was the previous, incorrect
+ * assumption -- it showed U20 players with the Espoirs team's fixtures).
+ * Since the fixtures tab has no U20/U19/U18/U17-specific row, those
+ * selections have no matching data at all right now, not a fallback to
+ * the nearest bucket.
  */
 function englishCountryForSelection_(selection) {
   var sel = String(selection || '').trim();
   if (!sel) return null;
-  var isEspoir = /\s+(ESPOIR|ESP|U1[6-9]|U2[0-1])$/i.test(sel);
+  var isEspoir = /\s+(ESPOIR|ESP)$/i.test(sel);
+  var isOtherYouthAgeGroup = /\s+U1[6-9]$/i.test(sel) || /\s+U2[0-1]$/i.test(sel);
+  if (isOtherYouthAgeGroup) return null;
   var base = sel.replace(SELECTION_SUFFIX_RE_, '').trim();
   var english = normalizedCountryLookup_()[normalizeCountryKey_(base)];
   if (!english) return null;
