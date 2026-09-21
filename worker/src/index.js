@@ -17,16 +17,25 @@
  *                                      low-traffic page that doesn't need the same
  *                                      near-real-time freshness as the main journée
  *                                      view -- a periodic lazy refresh is cheaper.
+ *   GET  /?matchsSelection=1       -> cached (or live-fetched+cached) international-
+ *                                      break payload (see
+ *                                      frontend/matchs-en-selection.html) -- single
+ *                                      key ("matchsSelection", no per-journée
+ *                                      variants), same bounded-TTL reasoning and
+ *                                      same NOT-wired-into-/__revalidate/-/__warm-all
+ *                                      treatment as risqueSuspension above.
  *   POST /__revalidate             -> webhook, called from Code.gs on data changes:
  *                                      re-fetches and overwrites KV for specific
  *                                      journée(s) (always + "meta"). Requires the
  *                                      X-Revalidate-Secret header. Does NOT cover
- *                                      risqueSuspension keys -- see above.
+ *                                      risqueSuspension/matchsSelection keys -- see
+ *                                      above.
  *   GET|POST /__warm-all           -> one-off admin command: populate KV for every
  *                                      journée currently in ?meta=1. Same secret,
  *                                      accepted as a header OR a ?secret= query
  *                                      param so it's easy to curl by hand. Also
- *                                      does NOT cover risqueSuspension keys.
+ *                                      does NOT cover risqueSuspension/matchsSelection
+ *                                      keys.
  *
  * KV key scheme for /?journee=/?meta=1 deliberately mirrors Code.gs's own
  * doGet cache-key logic exactly (`cacheKey = journee ? 'journee:'+journee :
@@ -101,6 +110,9 @@ async function handleCachedProxy(url, env) {
   if (risque) {
     return handleCachedRisqueSuspension(risque, env);
   }
+  if (url.searchParams.get('matchsSelection')) {
+    return handleCachedMatchsSelection(env);
+  }
 
   const journee = url.searchParams.get('journee');
   const key = cacheKeyForJournee(journee);
@@ -123,6 +135,19 @@ async function handleCachedRisqueSuspension(risque, env) {
   }
 
   const originUrl = env.APPS_SCRIPT_BASE + '?risqueSuspension=' + encodeURIComponent(risque);
+  const json = await fetchOriginJsonWithRetry(originUrl, 3, 2000, 30000);
+  await env.CACHE.put(key, json, { expirationTtl: RISQUE_CACHE_TTL_SECONDS });
+  return jsonPayload(json, { 'X-Cache': 'MISS' });
+}
+
+async function handleCachedMatchsSelection(env) {
+  const key = 'matchsSelection';
+  const cached = await env.CACHE.get(key);
+  if (cached !== null) {
+    return jsonPayload(cached, { 'X-Cache': 'HIT' });
+  }
+
+  const originUrl = env.APPS_SCRIPT_BASE + '?matchsSelection=1';
   const json = await fetchOriginJsonWithRetry(originUrl, 3, 2000, 30000);
   await env.CACHE.put(key, json, { expirationTtl: RISQUE_CACHE_TTL_SECONDS });
   return jsonPayload(json, { 'X-Cache': 'MISS' });

@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Matchs en Sélection Ligue 1 | Fantasy Coach</title>
+<meta name="description" content="Pendant la trêve internationale, quels joueurs de Ligue 1 sont en sélection et quels matchs ils vont disputer.">
+<link rel="canonical" href="https://l1.dnp.fantasy-coach.fr/matchs-en-selection.html">
+<link rel="icon" type="image/png" href="https://static.wixstatic.com/media/449182_b075115d95e54908bebcaaef43561929~mv2.png/v1/fill/w_64,h_64,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/newlogo.png">
+<meta name="robots" content="index, follow">
+<!-- Shared nav/ads/feedback/analytics components — see https://github.com/lionelleboiteux/fc-shared -->
+<script src="https://cdn.jsdelivr.net/gh/lionelleboiteux/fc-shared@ee6630a/nav.js" defer></script>
+<script src="https://cdn.jsdelivr.net/gh/lionelleboiteux/fc-shared@ee6630a/ads.js" async></script>
+<script src="https://cdn.jsdelivr.net/gh/lionelleboiteux/fc-shared@ee6630a/feedback.js" defer></script>
+<script src="https://cdn.jsdelivr.net/gh/lionelleboiteux/fc-shared@ee6630a/ga.js" async></script>
+<script src="https://cdn.jsdelivr.net/gh/lionelleboiteux/fc-shared@ee6630a/pageview.js" data-project="dnp" async></script>
+<style>
+  :root {
+    /* Same palette as index.html so this reads as part of the same site. */
+    --fc-blue: #3d9be9;
+    --fc-blue-light: #63b0ee;
+    --bg: #ffffff;
+    --card: #ffffff;
+    --ink: #1c1917;
+    --muted: #6b6560;
+    --border: #d6d3d1;
+    --accent: var(--fc-blue);
+    --accent-ink: #ffffff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 0 1rem 1rem;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.5;
+  }
+  .site-footer { text-align: center; font-size: 0.8rem; color: var(--muted); margin: 2.5rem 0 1rem; }
+  main { max-width: 960px; margin: 0 auto; }
+  h1 { font-size: 1.4rem; margin: 0.5rem 0 1rem; }
+  .intro { margin-bottom: 1.25rem; }
+  .intro p { margin: 0.5rem 0; }
+  /* Two independent filters, side by side on wide screens, stacked on
+     narrow ones -- see the frontend's filterAndRender_ for how they
+     combine (both must match, not either/or). */
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+  .filters > div { flex: 1 1 220px; }
+  .filters label { display: block; font-weight: 600; margin-bottom: 0.4rem; }
+  .filters select {
+    width: 100%;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--ink);
+    font-size: 1rem;
+  }
+  .status-line { color: var(--muted); font-size: 0.9rem; margin: 0.5rem 0 1rem; }
+  .last-updated {
+    margin: 0 0 1.25rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .last-updated-time {
+    margin-left: 0.4rem;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .team-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .team-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.9rem 1rem 1rem;
+  }
+  .team-card h2 {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem 0.55rem;
+    font-size: 1.05rem;
+    margin: 0 0 0.6rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--accent);
+  }
+  .team-logo {
+    flex: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    object-fit: contain;
+  }
+  .team-logo-fallback {
+    flex: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--accent-ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.68rem;
+    font-weight: 700;
+  }
+  .player-block {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .player-block:last-child { border-bottom: none; }
+  .player-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .player-poste {
+    flex: none;
+    background: #eaf3fc;
+    color: var(--fc-blue);
+    font-weight: 700;
+    font-size: 0.72rem;
+    text-align: center;
+    padding: 0.15rem 0;
+    border-radius: 5px;
+    width: 2.75rem;
+  }
+  .player-name { font-weight: 600; }
+  .player-selection {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--accent);
+    background: #eaf3fc;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    white-space: nowrap;
+    margin-left: auto;
+  }
+  .player-matchs {
+    margin: 0.4rem 0 0 3.25rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  .match-chip {
+    font-size: 0.78rem;
+    color: var(--muted);
+    background: #f4f2f0;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .no-match { font-size: 0.8rem; color: var(--muted); font-style: italic; margin: 0.4rem 0 0 3.25rem; }
+  .empty-state, .error-state {
+    text-align: center;
+    color: var(--muted);
+    padding: 2rem 1rem;
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+  }
+  .error-state { color: #b91c1c; }
+</style>
+</head>
+<body>
+<fc-nav current="dnp"></fc-nav>
+
+<main id="app">
+  <h1>Matchs en sélection — Ligue 1</h1>
+  <div class="intro">
+    <p>Pendant la trêve internationale, quels joueurs de Ligue 1 sont en sélection, et quels matchs ils vont disputer.</p>
+  </div>
+
+  <div class="filters">
+    <div>
+      <label for="club-select">Club</label>
+      <select id="club-select" disabled>
+        <option value="">Chargement…</option>
+      </select>
+    </div>
+    <div>
+      <label for="country-select">Sélection</label>
+      <select id="country-select" disabled>
+        <option value="">Chargement…</option>
+      </select>
+    </div>
+  </div>
+
+  <p id="last-updated" class="last-updated"></p>
+
+  <p id="status-line" class="status-line"></p>
+  <div id="team-grid" class="team-grid"></div>
+  <noscript><p>Activez JavaScript pour afficher les matchs en sélection.</p></noscript>
+
+  <fc-feedback project="DNP"></fc-feedback>
+</main>
+
+<footer class="site-footer">&copy;2026 by Fantasy Coach.</footer>
+
+<script>
+(function () {
+  // ?api=<url> overrides the default for local/dev testing only; never
+  // persisted, so production use is unaffected. Same convention as
+  // index.html's.
+  var API_BASE = new URLSearchParams(location.search).get('api') ||
+    'https://dnp-l1-cache.fantasycoachfr.workers.dev';
+
+  var clubSelect = document.getElementById('club-select');
+  var countrySelect = document.getElementById('country-select');
+  var statusLine = document.getElementById('status-line');
+  var teamGrid = document.getElementById('team-grid');
+  var lastUpdatedEl = document.getElementById('last-updated');
+
+  function el(tag, attrs, children) {
+    var e = document.createElement(tag);
+    for (var k in (attrs || {})) {
+      if (k === 'text') e.textContent = attrs[k];
+      else e.setAttribute(k, attrs[k]);
+    }
+    (children || []).forEach(function (c) { e.appendChild(c); });
+    return e;
+  }
+
+  function setStatus(text) {
+    statusLine.textContent = text || '';
+  }
+
+  // Same map as index.html's TEAM_LOGOS -- duplicated rather than shared,
+  // matching this repo's convention of each page being fully self-contained.
+  var TEAM_LOGOS = {
+    'Angers': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_4_37_512x512_b5149d8c4312c158b2975298205510eb.png',
+    'Auxerre': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_4_2_512x512_4bed22ddd777a8b0977284bee7f416a7.png',
+    'Brest': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_44_512x512_b8930455bc938de7b9f4e128e1036989.png',
+    'Le Havre': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_5_512x512_e9bf970697e022dcbd3d51e245f3682d.png',
+    'Lens': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2026_1_6_512x512_d08b45acce8a87d13b938cde8974362f.png',
+    'Lille': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_158_512x512_39a605746d9cf4eb12d9cd4f63adb27c.png',
+    'Lorient': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_7_512x512_7d0c497c5f41d0dcf5dabad2910699e3.png',
+    'Lyon': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_159_512x512_1a9c2cd8f58fba433bb5cd568b3de7d0.png',
+    'Marseille': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2025_1_1_512x512_16ca4f08072a6b6d99169ba2b6a8b228.png',
+    'Monaco': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_9_512x512_ad7dd146950eee8eb68ea9588a674fe8.png',
+    'Nice': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_30_512x512_2ccb89a2f1fbad23e693d1c5d101a25d.png',
+    'Paris FC': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_4_90_512x512_8b2bb52cf67eb9456c794509c7e58c46.png',
+    'Paris SG': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_13_512x512_4a9438034a011c1368c52d097a93b98f.png',
+    'Rennes': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_14_512x512_28c7492293ca34c6e26d6cb71e858a57.png',
+    'Strasbourg': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_15_512x512_e9553990e86d8098a3cf94febe8b4b96.png',
+    'Toulouse': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_1_16_512x512_a7be4e575396227614acc0ed47083503.png',
+    'Troyes': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_4_33_512x512_fa84337aa111aaf34990dd2590ba1789.png',
+    'Estac Troyes': 'https://s3.eu-west-1.amazonaws.com/image.mpg/assets/clubs/logo/2023_4_33_512x512_fa84337aa111aaf34990dd2590ba1789.png',
+    'Le Mans': 'https://s3.eu-west-1.amazonaws.com/image.mpg/daabb8d9-230e-4fe2-8214-682fbbdedb5e',
+    'Le Mans FC': 'https://s3.eu-west-1.amazonaws.com/image.mpg/daabb8d9-230e-4fe2-8214-682fbbdedb5e'
+  };
+
+  function teamInitials(equipe) {
+    return String(equipe || '?')
+      .split(/\s+/)
+      .map(function (w) { return w[0]; })
+      .join('')
+      .slice(0, 3)
+      .toUpperCase();
+  }
+
+  function formatPlayerName(prenom, nom) {
+    var initial = String(prenom || '').trim().charAt(0);
+    return String(nom || '').trim() + (initial ? ' ' + initial + '.' : '');
+  }
+
+  // The full, unfiltered payload from ?matchsSelection= -- filtering (see
+  // filterAndRender_) re-renders from this each time either dropdown
+  // changes, no re-fetch needed.
+  var fullData = null;
+
+  function renderTeams(equipes) {
+    teamGrid.innerHTML = '';
+    if (!equipes || equipes.length === 0) {
+      teamGrid.appendChild(el('div', { class: 'empty-state', text: 'Aucun joueur pour ce filtre.' }));
+      return;
+    }
+    equipes.forEach(function (team) {
+      var card = el('div', { class: 'team-card' });
+      var heading = el('h2', {});
+      var logoUrl = TEAM_LOGOS[team.equipe];
+      if (logoUrl) {
+        var logo = el('img', { class: 'team-logo', src: logoUrl, alt: team.equipe });
+        logo.addEventListener('error', function () {
+          this.replaceWith(el('span', { class: 'team-logo-fallback', text: teamInitials(team.equipe) }));
+        });
+        heading.appendChild(logo);
+      } else {
+        heading.appendChild(el('span', { class: 'team-logo-fallback', text: teamInitials(team.equipe) }));
+      }
+      heading.appendChild(el('span', { text: team.equipe }));
+      card.appendChild(heading);
+
+      team.joueurs.forEach(function (j) {
+        var block = el('div', { class: 'player-block' });
+        var header = el('div', { class: 'player-header' });
+        header.appendChild(el('span', { class: 'player-poste', text: j.posteFin || '' }));
+        header.appendChild(el('span', { class: 'player-name', text: formatPlayerName(j.prenom, j.nom) }));
+        header.appendChild(el('span', { class: 'player-selection', text: j.selection || '' }));
+        block.appendChild(header);
+
+        if (j.matchs && j.matchs.length) {
+          var matchsRow = el('div', { class: 'player-matchs' });
+          j.matchs.forEach(function (m) {
+            var icon = m.isHome === true ? '🏠 ' : (m.isHome === false ? '✈️ ' : '');
+            matchsRow.appendChild(el('span', { class: 'match-chip', text: icon + m.opponent }));
+          });
+          block.appendChild(matchsRow);
+        } else {
+          block.appendChild(el('div', { class: 'no-match', text: 'Pas de match confirmé' }));
+        }
+
+        card.appendChild(block);
+      });
+
+      teamGrid.appendChild(card);
+    });
+  }
+
+  // Both filters must match (not either/or) -- "Tous" (empty value) on a
+  // filter means it never excludes anything.
+  function filterAndRender_() {
+    if (!fullData) return;
+    var club = clubSelect.value;
+    var country = countrySelect.value;
+    var filtered = fullData.equipes
+      .filter(function (team) { return !club || team.equipe === club; })
+      .map(function (team) {
+        var joueurs = team.joueurs.filter(function (j) { return !country || j.selection === country; });
+        return { equipe: team.equipe, joueurs: joueurs };
+      })
+      .filter(function (team) { return team.joueurs.length > 0; });
+    renderTeams(filtered);
+  }
+
+  // ISO datetime -> "dd/mm  HH:mm" in Europe/Paris, fr-FR locale -- same
+  // formatting as index.html's formatLastUpdated_.
+  function formatLastUpdated_(iso) {
+    var d = iso ? new Date(iso) : null;
+    if (!d || isNaN(d.getTime())) return null;
+    var parts = {};
+    new Intl.DateTimeFormat('fr-FR', {
+      timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false
+    }).formatToParts(d).forEach(function (p) { parts[p.type] = p.value; });
+    if (!parts.day || !parts.month || !parts.hour || !parts.minute) return null;
+    return parts.day + '/' + parts.month + '  ' + parts.hour + ':' + parts.minute;
+  }
+
+  function renderLastUpdated(iso) {
+    var formatted = formatLastUpdated_(iso);
+    lastUpdatedEl.innerHTML = '';
+    if (!formatted) return;
+    lastUpdatedEl.appendChild(el('span', { text: 'Dernière mise à jour :' }));
+    lastUpdatedEl.appendChild(el('span', { class: 'last-updated-time', text: formatted }));
+  }
+
+  setStatus('Chargement…');
+  fetch(API_BASE + '?matchsSelection=1')
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data && data.error) throw new Error(data.error);
+      fullData = data;
+      setStatus('');
+      renderLastUpdated(data.lastUpdated);
+
+      clubSelect.innerHTML = '';
+      clubSelect.appendChild(el('option', { value: '', text: 'Tous les clubs' }));
+      data.equipes.forEach(function (team) {
+        clubSelect.appendChild(el('option', { value: team.equipe, text: team.equipe }));
+      });
+      clubSelect.disabled = false;
+      clubSelect.addEventListener('change', filterAndRender_);
+
+      countrySelect.innerHTML = '';
+      countrySelect.appendChild(el('option', { value: '', text: 'Toutes les sélections' }));
+      (data.countries || []).forEach(function (c) {
+        countrySelect.appendChild(el('option', { value: c, text: c }));
+      });
+      countrySelect.disabled = false;
+      countrySelect.addEventListener('change', filterAndRender_);
+
+      renderTeams(data.equipes);
+    })
+    .catch(function (err) {
+      setStatus('');
+      clubSelect.innerHTML = '';
+      clubSelect.appendChild(el('option', { text: 'Erreur de chargement' }));
+      countrySelect.innerHTML = '';
+      countrySelect.appendChild(el('option', { text: 'Erreur de chargement' }));
+      teamGrid.appendChild(el('div', { class: 'error-state', text: 'Impossible de charger les données (' + err.message + ').' }));
+    });
+})();
+</script>
+</body>
+</html>

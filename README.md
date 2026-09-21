@@ -121,8 +121,9 @@ Gotchas:
 ### 2. Cloudflare Worker cache (edge caching in front of the Apps Script API)
 
 `worker/` is a small Cloudflare Worker that caches the Apps Script JSON API
-(`?meta=1`, `?journee=...`, and `?risqueSuspension=...` — see
-[`suspensionsProchainJaune.html`](#notes) in Notes) in Workers KV, so an
+(`?meta=1`, `?journee=...`, `?risqueSuspension=...` — see
+[`suspensionsProchainJaune.html`](#notes) — and `?matchsSelection=1` — see
+[`matchs-en-selection.html`](#notes) — in Notes) in Workers KV, so an
 ordinary visit never has to wait on Apps Script's cold start (10-40s after
 the container's been idle). The frontend fetches from the Worker instead
 of Apps Script directly.
@@ -290,6 +291,26 @@ either the Worker or Apps Script directly.)
   push-on-refresh, since folding ~34 more keys into every "⚡ Cache" click
   would double its KV write cost for a page that doesn't need the same
   freshness guarantee.
+- **`frontend/matchs-en-selection.html`**: a third static page, same
+  reuse-the-existing-deployment approach as above. Lists, for players
+  ticked in the "Dans la liste" column of "Liste Joueur 26-27", the
+  matches their national team plays during the current international
+  break, pulled from the "Selections fixtures" tab (`Country` + up to 4
+  opponent columns, each optionally suffixed with a 🏠/✈️ emoji for
+  home/away) and matched to each player's own "Sélection" column value.
+  New `doGet` endpoint `?matchsSelection=1`
+  (`readPlayersInSelection_`/`readSelectionsFixtures_` in `Code.gs`),
+  single Worker cache key (`matchsSelection`, same bounded 6h TTL as
+  `risqueSuspension`). The two "Sélection" vocabularies (the free-text
+  values actually typed vs. the "Selections fixtures" tab's English
+  country names) don't match directly — case, accents, and suffixes like
+  "Espoir"/"U20" all vary — so matching goes through
+  `normalizedCountryLookup_`/`englishCountryForSelection_`, an
+  accent/case-insensitive lookup over the `PAYS_TO_ENGLISH_COUNTRY_` map
+  plus a few manual aliases, not a literal string match. The page itself
+  fetches the single payload once and filters client-side with two
+  independent dropdowns (club, country, both default "Tous",
+  combinable) rather than re-fetching per filter.
 - **Caching**: two independent layers. `Code.gs`'s own `CacheService`
   (script-side, up to 6h, invalidated by bumping a version stamp on
   `onEdit`) protects `SpreadsheetApp` reads from repeat requests and

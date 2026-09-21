@@ -45,6 +45,22 @@
  *                         short French label saying which (or both) —
  *                         see readPlayersAtRiskOfSuspension_. Powers
  *                         frontend/suspensionsProchainJaune.html.
+ *   ?matchsSelection=1 -> { equipes: [{ equipe, joueurs: [{nom, prenom, posteFin,
+ *                         selection, matchs: [{opponent, isHome}]}] }],
+ *                         countries: [PAYS strings, sorted],
+ *                         lastUpdated: ISO datetime | null }
+ *                         Players with "Dans la liste" checked (col 146),
+ *                         grouped by club, each with their "Sélection"
+ *                         (col 145, PAYS format) and that selection's
+ *                         fixtures for the current international break,
+ *                         read from the "Selections fixtures" tab (Country
+ *                         | Opponent 1..4, English names) and joined via
+ *                         englishCountryForSelection_ -- see
+ *                         readPlayersInSelection_/readSelectionsFixtures_.
+ *                         `isHome` is true/false/null (fixture found but
+ *                         no home/away icon on it). No journée/break
+ *                         picker -- always whatever's currently in that
+ *                         tab. Powers frontend/matchs-en-selection.html.
  *
  * Responses are cached in CacheService (script-wide, up to 6h) so repeat
  * requests skip the SpreadsheetApp reads entirely. The cache is invalidated
@@ -112,9 +128,21 @@ var CACHE_TTL_SECONDS = 21600;
 // others had already expired/recomputed). Bumping this forces every entry
 // to recompute on the next request after a shape change, independent of
 // edits.
-var CACHE_SCHEMA_VERSION = 3;
+var CACHE_SCHEMA_VERSION = 5;
 
 function doGet(e) {
+  if (e.parameter.matchsSelection) {
+    var msCached = cacheGet_('matchsSelection');
+    if (msCached !== null) {
+      return jsonResponseRaw_(msCached);
+    }
+    var msPayload = readPlayersInSelection_();
+    msPayload.lastUpdated = lastUpdatedIso_();
+    var msJson = JSON.stringify(msPayload);
+    cacheSet_('matchsSelection', msJson);
+    return jsonResponseRaw_(msJson);
+  }
+
   var journee = e.parameter.journee;
   var risqueSuspension = e.parameter.risqueSuspension;
   var cacheKey = risqueSuspension ? 'risque:' + risqueSuspension
@@ -533,6 +561,247 @@ function findSuiviSuspensionColumn_(sheet) {
   }
   return null;
 }
+
+// "Sélection"/"Dans la liste" columns and "Selections fixtures" tab (see
+// doGet's ?matchsSelection= docs above). SELECTION_COL/DANS_LA_LISTE_COL
+// are hardcoded (confirmed live via a one-off header search, same way
+// SUIVI_SUSPENSION_HEADER's column was found) rather than looked up by
+// header text each request like findSuiviSuspensionColumn_ does -- these
+// two are read on every ?matchsSelection= request instead of once per
+// backfill run, so a live header-text scan on every request would add a
+// second full-header-row read to an already-uncached-on-miss endpoint for
+// no real benefit; re-check the header row by hand if these ever shift.
+var SELECTION_COL = 145;
+var DANS_LA_LISTE_COL = 146;
+var SHEET_NAME_SELECTIONS_FIXTURES = 'Selections fixtures';
+
+// "Sélection"'s values (French, e.g. "Côte d'Ivoire Espoir" -- confirmed
+// live 2026-09-21 that what's actually typed there doesn't consistently
+// match the "Sélection" reference tab's own PAYS dropdown spelling/casing,
+// e.g. "Congo Brazzaville" instead of that tab's "REP CONGO B") and
+// "Selections fixtures"'s Country values (English, e.g. "Côte d’Ivoire —
+// espoir") use two entirely different vocabularies for the same countries
+// -- this maps PAYS' BASE country name (suffix stripped) to the English
+// name "Selections fixtures" actually uses. Matched case/accent-
+// insensitively at lookup time, not as literal keys here -- see
+// normalizedCountryLookup_/englishCountryForSelection_ below, which also
+// layers in the handful of aliases the live sheet uses instead of the
+// PAYS tab's own spelling. Covers every country in the "Sélection" tab's
+// own PAYS list (confirmed 2026-09-21), not just ones currently assigned
+// to a player, so a newly-assigned country doesn't silently fail the join
+// later.
+var PAYS_TO_ENGLISH_COUNTRY_ = {
+  'AFRIQUE DU SUD': 'South Africa', 'ALBANIE': 'Albania', 'ALGERIE': 'Algeria',
+  'ALLEMAGNE': 'Germany', 'ANDORRE': 'Andorra', 'ANGLETERRE': 'England',
+  'ANGOLA': 'Angola', 'ARABIE SAOUDITE': 'Saudi Arabia', 'ARGENTINE': 'Argentina',
+  'ARMENIE': 'Armenia', 'AUSTRALIE': 'Australia', 'AUTRICHE': 'Austria',
+  'AZERBAIDJAN': 'Azerbaijan', 'BARHEIN': 'Bahrain', 'BELGIQUE': 'Belgium',
+  'BENIN': 'Benin', 'BIELORUSSIE': 'Belarus', 'BOLIVIE': 'Bolivia',
+  'BOSNIE': 'Bosnia and Herzegovina', 'BOTSWANA': 'Botswana', 'BRESIL': 'Brazil',
+  'BULGARIE': 'Bulgaria', 'BURKINA FASO': 'Burkina Faso', 'BURKINA FASSO': 'Burkina Faso',
+  'BURUNDI': 'Burundi', 'CAMEROUN': 'Cameroon', 'CANADA': 'Canada',
+  'CAP-VERT': 'Cape Verde', 'CENTRAFRIQUE': 'Central African Republic', 'CHILI': 'Chile',
+  'CHINE': 'China', 'CHYPRE': 'Cyprus', 'COLOMBIE': 'Colombia',
+  'COMORES': 'Comoros', 'CONGO RDC': 'DR Congo', 'COREE DU SUD': 'South Korea',
+  'COSTA RICA': 'Costa Rica', 'COTE D\'IVOIRE': 'Côte d’Ivoire', 'CROATIE': 'Croatia',
+  'CUBA': 'Cuba', 'CURACAO': 'Curaçao', 'DANEMARK': 'Denmark',
+  'DJIBOUTI': 'Djibouti', 'EAU U23': 'United Arab Emirates', 'ECOSSE': 'Scotland',
+  'EGYPTE': 'Egypt', 'EMIRATS ARABES UNIS': 'United Arab Emirates', 'EQUATEUR': 'Ecuador',
+  'ERYTHREE': 'Eritrea', 'ESPAGNE': 'Spain', 'ESTONIE': 'Estonia',
+  'ETHIOPIE': 'Ethiopia', 'FINLANDE': 'Finland', 'FRANCE': 'France',
+  'GABON': 'Gabon', 'GAMBIE': 'Gambia', 'GEORGIE': 'Georgia',
+  'GHANA': 'Ghana', 'GIBRALTAR': 'Gibraltar', 'GRECE': 'Greece',
+  'GUADELOUPE': 'Guadeloupe', 'GUATEMALA': 'Guatemala', 'GUINEE BISSAU': 'Guinea-Bissau',
+  'GUINEE CONAKRY': 'Guinea', 'GUINEE EQUATO': 'Equatorial Guinea', 'GUYANE': 'Guyana',
+  'HAÏTI': 'Haiti', 'HONDURAS': 'Honduras', 'HONG KONG': 'Hong Kong',
+  'HONGRIE': 'Hungary', 'ILES FEROE': 'Faroe Islands', 'INDE': 'India',
+  'INDONESIE': 'Indonesia', 'IRAN': 'Iran', 'IRAQ': 'Iraq',
+  'IRLANCE': 'Republic of Ireland', 'IRLANDE': 'Republic of Ireland', 'IRLANDE DU NORD': 'Northern Ireland',
+  'ISLANDE': 'Iceland', 'ISRAEL': 'Israel', 'ITALIE': 'Italy',
+  'JAMAIQUE': 'Jamaica', 'JAPON': 'Japan', 'JORDANIE': 'Jordan',
+  'KAZAKHSTAN': 'Kazakhstan', 'KENYA': 'Kenya', 'KIRGHIZISTAN': 'Kyrgyzstan',
+  'KOSOVO': 'Kosovo', 'KOWEIT': 'Kuwait', 'LESOTHO': 'Lesotho',
+  'LETTONIE': 'Latvia', 'LIBAN': 'Lebanon', 'LIBERIA': 'Liberia',
+  'LIECHTENSTEIN': 'Liechtenstein', 'LITUANIE': 'Lithuania', 'LUXEMBOURG': 'Luxembourg',
+  'LYBIE': 'Libya', 'MACEDOINE DU NORD': 'North Macedonia', 'MADAGASCAR': 'Madagascar',
+  'MALAISIE': 'Malaysia', 'MALAWI': 'Malawi', 'MALI': 'Mali',
+  'MALTE': 'Malta', 'MAROC': 'Morocco', 'MARTINIQUE': 'Martinique',
+  'MAURITANIE': 'Mauritania', 'MEXIQUE': 'Mexico', 'MOLDAVIE': 'Moldova',
+  'MONTENEGRO': 'Montenegro', 'MOZAMBIQUE': 'Mozambique', 'MYANMAR': 'Myanmar',
+  'NAMIBIE': 'Namibia', 'NICARAGUA': 'Nicaragua', 'NIGER': 'Niger',
+  'NIGERIA': 'Nigeria', 'NORVEGE': 'Norway', 'NOUVELLE CALEDONIE': 'New Caledonia',
+  'NOUVELLE ZELANDE': 'New Zealand', 'OMAN': 'Oman', 'OUGANDA': 'Uganda',
+  'OUZBEKISTAN': 'Uzbekistan', 'PALESTINE': 'Palestine', 'PANAMA': 'Panama',
+  'PARAGUAY': 'Paraguay', 'PAYS DE GALLES': 'Wales', 'PAYS-BAS': 'Netherlands',
+  'PEROU': 'Peru', 'PHILIPPINES': 'Philippines', 'POLOGNE': 'Poland',
+  'PORTUGAL': 'Portugal', 'QATAR': 'Qatar', 'REP CONGO B': 'Congo',
+  'REP TCHEQUE': 'Czech Republic', 'ROUMANIE': 'Romania', 'RUSSIE': 'Russia',
+  'RWANDA': 'Rwanda', 'SAINT-MARIN': 'San Marino', 'SALVADOR': 'El Salvador',
+  'SAO TOME': 'Sao Tome and Principe', 'SENEGAL': 'Senegal', 'SERBIE': 'Serbia',
+  'SIERRA LEONE': 'Sierra Leone', 'SINGAPOUR': 'Singapore', 'SLOVAQUIE': 'Slovakia',
+  'SLOVENIE': 'Slovenia', 'SOMALIE': 'Somalia', 'SOUDAN SUD': 'South Sudan',
+  'SUEDE': 'Sweden', 'SUISSE': 'Switzerland', 'SURINAM': 'Suriname',
+  'SYRIE': 'Syria', 'TAJIKISTAN': 'Tajikistan', 'TANZANIE': 'Tanzania',
+  'TCHAD': 'Chad', 'THAÏLANDE': 'Thailand', 'TOGO': 'Togo',
+  'TUNISIE': 'Tunisia', 'TURQUIE': 'Turkey', 'UKRAINE': 'Ukraine',
+  'URUGUAY': 'Uruguay', 'USA': 'United States', 'VENEZUELA': 'Venezuela',
+  'VIETNAM': 'Vietnam', 'ZAMBIE': 'Zambia', 'ZIMBABWE': 'Zimbabwe'
+};
+
+// Matches any espoir/youth suffix seen in practice, case-insensitively --
+// both the "Sélection" reference tab's own PAYS abbreviations (ESP/ESPOIR/
+// U16-U21) AND what's actually typed in the live sheet (the full word
+// "Espoir", confirmed live 2026-09-21 -- the two don't agree with each
+// other) -- or the senior-only "A" suffix (e.g. "FRANCE A").
+var SELECTION_SUFFIX_RE_ = /\s+(ESPOIR|ESP|U1[6-9]|U2[0-1]|A)$/i;
+
+// Lazily-built accent/case-insensitive view of PAYS_TO_ENGLISH_COUNTRY_,
+// plus a few aliases confirmed live in the "Sélection" column that don't
+// match the "Sélection" reference tab's own PAYS spelling at all (e.g. the
+// sheet maintainer writes "Congo Brazzaville" and "Etats-Unis" by hand,
+// where the PAYS tab calls those "REP CONGO B" and "USA") -- see
+// englishCountryForSelection_.
+var PAYS_TO_ENGLISH_COUNTRY_NORMALIZED_ = null;
+
+function normalizeCountryKey_(s) {
+  return String(s || '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '') // strip accents
+    .toUpperCase()
+    .trim();
+}
+
+function normalizedCountryLookup_() {
+  if (!PAYS_TO_ENGLISH_COUNTRY_NORMALIZED_) {
+    var lookup = {};
+    Object.keys(PAYS_TO_ENGLISH_COUNTRY_).forEach(function (k) {
+      lookup[normalizeCountryKey_(k)] = PAYS_TO_ENGLISH_COUNTRY_[k];
+    });
+    lookup['CONGO BRAZZAVILLE'] = 'Congo';
+    lookup['ETATS-UNIS'] = 'United States';
+    lookup['TCHEQUIE'] = 'Czech Republic';
+    PAYS_TO_ENGLISH_COUNTRY_NORMALIZED_ = lookup;
+  }
+  return PAYS_TO_ENGLISH_COUNTRY_NORMALIZED_;
+}
+
+/**
+ * Converts a "Sélection" value (e.g. "Côte d'Ivoire Espoir", "France A",
+ * "GABON" -- casing/accents vary in practice, see SELECTION_SUFFIX_RE_'s
+ * comment) to the exact Country string "Selections fixtures" keys its
+ * fixtures by (e.g. "Côte d’Ivoire — espoir", "France", "Gabon"). Returns
+ * null if the base country isn't found even after normalizing (shouldn't
+ * happen for any value actually seen in the sheet as of 2026-09-21, but
+ * defensive against a typo or a genuinely new country) -- callers then
+ * just show no fixtures for that player rather than erroring.
+ *
+ * "Selections fixtures" doesn't distinguish youth levels (no separate
+ * U17/U20/Espoirs rows per country, just one "— espoir" bucket per
+ * country) -- so ANY espoir-type suffix maps to that same bucket, not a
+ * level-specific lookup.
+ */
+function englishCountryForSelection_(selection) {
+  var sel = String(selection || '').trim();
+  if (!sel) return null;
+  var isEspoir = /\s+(ESPOIR|ESP|U1[6-9]|U2[0-1])$/i.test(sel);
+  var base = sel.replace(SELECTION_SUFFIX_RE_, '').trim();
+  var english = normalizedCountryLookup_()[normalizeCountryKey_(base)];
+  if (!english) return null;
+  return isEspoir ? english + ' — espoir' : english;
+}
+
+/**
+ * { EnglishCountryName: [{ opponent, isHome }, ...] } from the "Selections
+ * fixtures" tab -- one row per country, up to 4 opponent columns, each a
+ * raw string like "Morocco ✈️" (✈️ = away, 🏠 = home), "—" (empty slot,
+ * skipped), or the literal placeholder "No confirmed fixture found" for
+ * an espoir team with nothing scheduled yet (also skipped -- not a real
+ * fixture). isHome is null if a fixture has neither icon (unexpected, but
+ * shown rather than dropped). Returns {} if the tab's ever renamed/missing
+ * rather than erroring the whole ?matchsSelection= request over it.
+ */
+function readSelectionsFixtures_() {
+  var sheet = SpreadsheetApp.getActive().getSheetByName(SHEET_NAME_SELECTIONS_FIXTURES);
+  if (!sheet) return {};
+  var lastRow = sheet.getLastRow();
+  var lastCol = sheet.getLastColumn();
+  if (lastRow < 2) return {};
+
+  var values = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+  var byCountry = {};
+  values.forEach(function (row) {
+    var country = String(row[0] || '').trim();
+    if (!country) return;
+    var matchs = [];
+    for (var c = 1; c < row.length; c++) {
+      var raw = String(row[c] || '').trim();
+      if (!raw || raw === '—' || raw === 'No confirmed fixture found') continue;
+      // Trailing icon: 🏠 (U+1F3E0, a surrogate pair) or ✈️ (U+2708 +
+      // U+FE0F variation selector). The `u` flag is required for a
+      // character class to treat 🏠 as one codepoint instead of two stray
+      // surrogate halves -- without it this silently left mangled
+      // leftover characters in `opponent` (confirmed live 2026-09-21).
+      var isHome = /\u{1F3E0}\s*$/u.test(raw);
+      var isAway = /\u{2708}\u{FE0F}?\s*$/u.test(raw);
+      var opponent = raw.replace(/[\u{1F3E0}\u{2708}\u{FE0F}]/gu, '').trim();
+      matchs.push({ opponent: opponent, isHome: isHome ? true : (isAway ? false : null) });
+    }
+    byCountry[country] = matchs;
+  });
+  return byCountry;
+}
+
+/**
+ * Players with "Dans la liste" checked, grouped by club (equipe), each
+ * with their raw "Sélection" PAYS string and that selection's matchs for
+ * the current international break -- see doGet's ?matchsSelection= docs
+ * above. `countries` is every distinct Sélection value actually present
+ * among included players (sorted), for the frontend's country filter.
+ */
+function readPlayersInSelection_() {
+  var sheet = SpreadsheetApp.getActive().getSheetByName(SHEET_NAME);
+  var lastRow = sheet.getLastRow();
+  var numRows = lastRow - FIRST_DATA_ROW + 1;
+  if (numRows <= 0) return { equipes: [], countries: [] };
+
+  var identity = sheet.getRange(FIRST_DATA_ROW, 1, numRows, COL_POSTE_FIN).getValues();
+  var selectionVals = sheet.getRange(FIRST_DATA_ROW, SELECTION_COL, numRows, 1).getValues();
+  var dansListe = sheet.getRange(FIRST_DATA_ROW, DANS_LA_LISTE_COL, numRows, 1).getValues();
+  var fixturesByCountry = readSelectionsFixtures_();
+
+  var byTeam = {};
+  var countriesSeen = {};
+  for (var i = 0; i < numRows; i++) {
+    if (dansListe[i][0] !== true) continue;
+
+    var nom = identity[i][COL_NOM - 1];
+    var equipe = identity[i][COL_EQUIPE - 1];
+    if (!nom || !equipe) continue; // skip malformed/incomplete rows
+
+    var sel = String(selectionVals[i][0] || '').trim();
+    if (!sel) continue; // "Dans la liste" but no Sélection yet -- nothing to show
+
+    var englishCountry = englishCountryForSelection_(sel);
+    var matchs = englishCountry ? (fixturesByCountry[englishCountry] || []) : [];
+
+    var player = {
+      nom: nom,
+      prenom: identity[i][COL_PRENOM - 1],
+      posteFin: identity[i][COL_POSTE_FIN - 1],
+      selection: sel,
+      matchs: matchs
+    };
+
+    if (!byTeam[equipe]) byTeam[equipe] = [];
+    byTeam[equipe].push(player);
+    countriesSeen[sel] = true;
+  }
+
+  var equipes = Object.keys(byTeam).sort().map(function (equipe) {
+    return { equipe: equipe, joueurs: byTeam[equipe] };
+  });
+  return { equipes: equipes, countries: Object.keys(countriesSeen).sort() };
+}
+
 
 /**
  * Reads the "Mise à jour" tab's A2:B19 status block (see STATUS_*
