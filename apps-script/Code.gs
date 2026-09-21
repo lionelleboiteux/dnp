@@ -46,7 +46,7 @@
  *                         see readPlayersAtRiskOfSuspension_. Powers
  *                         frontend/suspensionsProchainJaune.html.
  *   ?matchsSelection=1 -> { equipes: [{ equipe, joueurs: [{nom, prenom, posteFin,
- *                         selection, matchs: [{opponent, isHome}]}] }],
+ *                         selection, matchs: [{opponent, isHome, date}]}] }],
  *                         countries: [PAYS strings, sorted],
  *                         lastUpdated: ISO datetime | null }
  *                         Players with "Dans la liste" checked (col 146),
@@ -54,11 +54,14 @@
  *                         (col 145, PAYS format) and that selection's
  *                         fixtures for the current international break,
  *                         read from the "Selections fixtures" tab (Country
- *                         | Opponent 1..4, English names) and joined via
+ *                         | Opponent 1..4, English names, each cell shaped
+ *                         "Opponent [icon] — DD Mon") and joined via
  *                         englishCountryForSelection_ -- see
  *                         readPlayersInSelection_/readSelectionsFixtures_.
  *                         `isHome` is true/false/null (fixture found but
- *                         no home/away icon on it). No journée/break
+ *                         no home/away icon on it). `date` is the raw
+ *                         "DD Mon" string from the cell, or null if the
+ *                         cell had no trailing date. No journée/break
  *                         picker -- always whatever's currently in that
  *                         tab. Powers frontend/matchs-en-selection.html.
  *
@@ -128,7 +131,7 @@ var CACHE_TTL_SECONDS = 21600;
 // others had already expired/recomputed). Bumping this forces every entry
 // to recompute on the next request after a shape change, independent of
 // edits.
-var CACHE_SCHEMA_VERSION = 5;
+var CACHE_SCHEMA_VERSION = 6;
 
 function doGet(e) {
   if (e.parameter.matchsSelection) {
@@ -710,14 +713,17 @@ function englishCountryForSelection_(selection) {
 }
 
 /**
- * { EnglishCountryName: [{ opponent, isHome }, ...] } from the "Selections
- * fixtures" tab -- one row per country, up to 4 opponent columns, each a
- * raw string like "Morocco ✈️" (✈️ = away, 🏠 = home), "—" (empty slot,
+ * { EnglishCountryName: [{ opponent, isHome, date }, ...] } from the
+ * "Selections fixtures" tab -- one row per country, up to 4 opponent
+ * columns, each a raw string like "Türkiye ✈️ — 25 Sep" (✈️ = away,
+ * 🏠 = home, trailing "— DD Mon" added 2026-09-21), "—" (empty slot,
  * skipped), or the literal placeholder "No confirmed fixture found" for
  * an espoir team with nothing scheduled yet (also skipped -- not a real
  * fixture). isHome is null if a fixture has neither icon (unexpected, but
- * shown rather than dropped). Returns {} if the tab's ever renamed/missing
- * rather than erroring the whole ?matchsSelection= request over it.
+ * shown rather than dropped); date is null if the cell has no trailing
+ * "— DD Mon" (older/incomplete rows). Returns {} if the tab's ever
+ * renamed/missing rather than erroring the whole ?matchsSelection=
+ * request over it.
  */
 function readSelectionsFixtures_() {
   var sheet = SpreadsheetApp.getActive().getSheetByName(SHEET_NAME_SELECTIONS_FIXTURES);
@@ -735,15 +741,26 @@ function readSelectionsFixtures_() {
     for (var c = 1; c < row.length; c++) {
       var raw = String(row[c] || '').trim();
       if (!raw || raw === '—' || raw === 'No confirmed fixture found') continue;
-      // Trailing icon: 🏠 (U+1F3E0, a surrogate pair) or ✈️ (U+2708 +
-      // U+FE0F variation selector). The `u` flag is required for a
-      // character class to treat 🏠 as one codepoint instead of two stray
-      // surrogate halves -- without it this silently left mangled
-      // leftover characters in `opponent` (confirmed live 2026-09-21).
-      var isHome = /\u{1F3E0}\s*$/u.test(raw);
-      var isAway = /\u{2708}\u{FE0F}?\s*$/u.test(raw);
-      var opponent = raw.replace(/[\u{1F3E0}\u{2708}\u{FE0F}]/gu, '').trim();
-      matchs.push({ opponent: opponent, isHome: isHome ? true : (isAway ? false : null) });
+      // The date (if present) trails the icon as "— DD Mon", so the
+      // icon is no longer reliably at the end of the string -- split it
+      // off first (by the LAST em dash, since a plain opponent name
+      // never contains one) before looking for the icon in what's left.
+      // Getting this order backwards was the original bug: matching the
+      // icon at end-of-string against "Türkiye ✈️ — 25 Sep" always
+      // failed, so isHome came back null and the date text leaked into
+      // `opponent` (confirmed live 2026-09-21).
+      var dashIdx = raw.lastIndexOf('—');
+      var frontPart = dashIdx === -1 ? raw : raw.slice(0, dashIdx).trim();
+      var date = dashIdx === -1 ? null : raw.slice(dashIdx + 1).trim();
+      // Icon: 🏠 (U+1F3E0, a surrogate pair) or ✈️ (U+2708 + U+FE0F
+      // variation selector). The `u` flag is required for a character
+      // class to treat 🏠 as one codepoint instead of two stray surrogate
+      // halves -- without it this silently left mangled leftover
+      // characters in `opponent` (confirmed live 2026-09-21).
+      var isHome = /\u{1F3E0}\s*$/u.test(frontPart);
+      var isAway = /\u{2708}\u{FE0F}?\s*$/u.test(frontPart);
+      var opponent = frontPart.replace(/[\u{1F3E0}\u{2708}\u{FE0F}]/gu, '').trim();
+      matchs.push({ opponent: opponent, isHome: isHome ? true : (isAway ? false : null), date: date });
     }
     byCountry[country] = matchs;
   });

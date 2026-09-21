@@ -21,14 +21,19 @@
  *                                      break payload (see
  *                                      frontend/matchs-en-selection.html) -- single
  *                                      key ("matchsSelection", no per-journée
- *                                      variants), same bounded-TTL reasoning and
- *                                      same NOT-wired-into-/__revalidate/-/__warm-all
- *                                      treatment as risqueSuspension above.
+ *                                      variants), bounded 6h TTL as a fallback but
+ *                                      ALSO proactively refreshed by /__revalidate
+ *                                      below (unlike risqueSuspension) -- it's a
+ *                                      single extra KV write per manual "⚡ Cache"
+ *                                      click, not ~34 like risqueSuspension's
+ *                                      per-journée keys would be, so there's no
+ *                                      quota reason to leave it lazy-only.
  *   POST /__revalidate             -> webhook, called from Code.gs on data changes:
  *                                      re-fetches and overwrites KV for specific
- *                                      journée(s) (always + "meta"). Requires the
- *                                      X-Revalidate-Secret header. Does NOT cover
- *                                      risqueSuspension/matchsSelection keys -- see
+ *                                      journée(s) (always + "meta"), and always
+ *                                      also re-fetches+overwrites "matchsSelection".
+ *                                      Requires the X-Revalidate-Secret header.
+ *                                      Does NOT cover risqueSuspension keys -- see
  *                                      above.
  *   GET|POST /__warm-all           -> one-off admin command: populate KV for every
  *                                      journée currently in ?meta=1. Same secret,
@@ -207,8 +212,22 @@ async function handleRevalidate(request, env, ctx) {
   // simple triggers -- is never blocked on how long Apps Script itself
   // takes to answer the re-fetch below. The actual re-fetch+KV overwrite
   // continues in the background via ctx.waitUntil.
-  ctx.waitUntil(revalidateAll(targets, env));
-  return jsonResponse({ ok: true, queued: targets.map(cacheKeyForJournee) });
+  ctx.waitUntil(Promise.all([revalidateAll(targets, env), revalidateMatchsSelection(env)]));
+  return jsonResponse({ ok: true, queued: targets.map(cacheKeyForJournee).concat(['matchsSelection']) });
+}
+
+// Always re-fetched+overwritten alongside meta/journées on every manual
+// "⚡ Cache" refresh -- a single extra KV write, so (unlike risqueSuspension)
+// there's no quota reason to leave this on lazy 6h-TTL refresh only. Keeps
+// the bounded TTL as a fallback (see handleCachedMatchsSelection) in case
+// this webhook call itself fails or never fires.
+async function revalidateMatchsSelection(env) {
+  try {
+    const json = await fetchOriginJsonWithRetry(env.APPS_SCRIPT_BASE + '?matchsSelection=1', 1, 0, 25000);
+    await env.CACHE.put('matchsSelection', json, { expirationTtl: RISQUE_CACHE_TTL_SECONDS });
+  } catch (err) {
+    console.error('revalidate failed for matchsSelection', err);
+  }
 }
 
 async function revalidateAll(journees, env) {

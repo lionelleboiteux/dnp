@@ -313,7 +313,8 @@
           var matchsRow = el('div', { class: 'player-matchs' });
           j.matchs.forEach(function (m) {
             var icon = m.isHome === true ? '🏠 ' : (m.isHome === false ? '✈️ ' : '');
-            matchsRow.appendChild(el('span', { class: 'match-chip', text: icon + m.opponent }));
+            var dateSuffix = m.date ? ' (' + m.date + ')' : '';
+            matchsRow.appendChild(el('span', { class: 'match-chip', text: icon + m.opponent + dateSuffix }));
           });
           block.appendChild(matchsRow);
         } else {
