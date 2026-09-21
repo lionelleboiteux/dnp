@@ -46,7 +46,7 @@
  *                         see readPlayersAtRiskOfSuspension_. Powers
  *                         frontend/suspensionsProchainJaune.html.
  *   ?matchsSelection=1 -> { equipes: [{ equipe, joueurs: [{nom, prenom, posteFin,
- *                         selection, matchs: [{opponent, isHome, date}]}] }],
+ *                         selection, lien, matchs: [{opponent, isHome, date}]}] }],
  *                         countries: [PAYS strings, sorted],
  *                         lastUpdated: ISO datetime | null }
  *                         Players with "Dans la liste" checked (col 146),
@@ -61,9 +61,13 @@
  *                         `isHome` is true/false/null (fixture found but
  *                         no home/away icon on it). `date` is the raw
  *                         "DD Mon" string from the cell, or null if the
- *                         cell had no trailing date. No journée/break
- *                         picker -- always whatever's currently in that
- *                         tab. Powers frontend/matchs-en-selection.html.
+ *                         cell had no trailing date. `lien` is an image
+ *                         URL (or null) for that exact selection+age-group,
+ *                         from the "Sélection" reference tab's own PAYS/
+ *                         Lien columns -- see lienForSelection_. No
+ *                         journée/break picker -- always whatever's
+ *                         currently in that tab. Powers
+ *                         frontend/matchs-en-selection.html.
  *
  * Responses are cached in CacheService (script-wide, up to 6h) so repeat
  * requests skip the SpreadsheetApp reads entirely. The cache is invalidated
@@ -131,7 +135,7 @@ var CACHE_TTL_SECONDS = 21600;
 // others had already expired/recomputed). Bumping this forces every entry
 // to recompute on the next request after a shape change, independent of
 // edits.
-var CACHE_SCHEMA_VERSION = 7;
+var CACHE_SCHEMA_VERSION = 8;
 
 function doGet(e) {
   if (e.parameter.matchsSelection) {
@@ -577,6 +581,7 @@ function findSuiviSuspensionColumn_(sheet) {
 var SELECTION_COL = 145;
 var DANS_LA_LISTE_COL = 146;
 var SHEET_NAME_SELECTIONS_FIXTURES = 'Selections fixtures';
+var SHEET_NAME_SELECTION_REFERENCE = 'Sélection';
 
 // "Sélection"'s values (French, e.g. "Côte d'Ivoire Espoir" -- confirmed
 // live 2026-09-21 that what's actually typed there doesn't consistently
@@ -721,6 +726,93 @@ function englishCountryForSelection_(selection) {
   return isEspoir ? english + ' — espoir' : english;
 }
 
+// Same alias problem as normalizedCountryLookup_ (the sheet maintainer's
+// free-text "Sélection" values don't always match the "Sélection"
+// reference tab's own PAYS spelling), but targeting THAT tab's own base
+// spelling instead of the English name -- e.g. "Congo Brazzaville" needs
+// to resolve to the tab's "REP CONGO B" row, not "Congo".
+var SELECTION_BASE_ALIASES_ = {
+  'CONGO BRAZZAVILLE': 'REP CONGO B',
+  'ETATS-UNIS': 'USA',
+  'TCHEQUIE': 'REP TCHEQUE'
+};
+
+/**
+ * Splits a "Sélection"-shaped string into { base, category }, where
+ * category is one of 'SENIOR', 'ESPOIR', 'U16'..'U21' -- shared by both
+ * englishCountryForSelection_'s age-group check and lienForSelection_
+ * below, since both need to tell apart the exact same suffixes.
+ */
+function classifySelectionSuffix_(selection) {
+  var sel = String(selection || '').trim();
+  var m = sel.match(SELECTION_SUFFIX_RE_);
+  if (!m) return { base: sel, category: 'SENIOR' };
+  var suffix = m[1].toUpperCase();
+  var category = (suffix === 'ESPOIR' || suffix === 'ESP') ? 'ESPOIR'
+    : (suffix === 'A' ? 'SENIOR' : suffix);
+  return { base: sel.slice(0, sel.length - m[0].length).trim(), category: category };
+}
+
+// Lazily-built { normalizedPaysBase: { category: lienUrl } } from the
+// "Sélection" reference tab's own PAYS/Lien columns (see
+// selectionLienLookup_) -- unlike englishCountryForSelection_'s English-
+// name lookup, this tab genuinely has one row per age group (confirmed
+// live 2026-09-21: "FRANCE U19" and "FRANCE U20" are separate rows with
+// separate Lien images from "FRANCE Esp"), so no U16-U21 exclusion is
+// needed here -- every age group can have its own image.
+var SELECTION_LIEN_LOOKUP_ = null;
+
+function selectionLienLookup_() {
+  if (SELECTION_LIEN_LOOKUP_) return SELECTION_LIEN_LOOKUP_;
+  var lookup = {};
+  var sheet = SpreadsheetApp.getActive().getSheetByName(SHEET_NAME_SELECTION_REFERENCE);
+  if (sheet) {
+    var lastRow = sheet.getLastRow();
+    // Row 1 is a blank title row, row 2 is the "PAYS"/"CONFEDERATION"/
+    // "Lien" header -- real data starts row 3. Reading columns B:D by
+    // position (not by header-text search) like SELECTION_COL above --
+    // CONFEDERATION (col C) was inserted between PAYS and Lien at some
+    // point, so this must stay a 3-column read (B, C, D), not assume
+    // Lien is column C.
+    var numRows = lastRow - 2;
+    if (numRows > 0) {
+      var values = sheet.getRange(3, 2, numRows, 3).getValues();
+      values.forEach(function (row) {
+        var paysRaw = String(row[0] || '').trim();
+        var lien = String(row[2] || '').trim();
+        if (!paysRaw || !lien) return;
+        var parsed = classifySelectionSuffix_(paysRaw);
+        var baseKey = normalizeCountryKey_(parsed.base);
+        if (!lookup[baseKey]) lookup[baseKey] = {};
+        lookup[baseKey][parsed.category] = lien;
+      });
+    }
+  }
+  SELECTION_LIEN_LOOKUP_ = lookup;
+  return SELECTION_LIEN_LOOKUP_;
+}
+
+/**
+ * Image URL for a "Sélection" value (e.g. flag/crest artwork), from the
+ * "Sélection" reference tab's "Lien" column -- matched on the FULL
+ * base+age-group pair (not just the base country like
+ * englishCountryForSelection_), since this tab has a distinct Lien per
+ * age group. Returns null if there's no matching row or that row's Lien
+ * cell is blank (many U16-U18 rows have no image yet).
+ */
+function lienForSelection_(selection) {
+  var parsed = classifySelectionSuffix_(selection);
+  if (!parsed.base) return null;
+  var baseKey = normalizeCountryKey_(parsed.base);
+  var lookup = selectionLienLookup_();
+  var entry = lookup[baseKey];
+  if (!entry) {
+    var aliasTarget = SELECTION_BASE_ALIASES_[baseKey];
+    if (aliasTarget) entry = lookup[normalizeCountryKey_(aliasTarget)];
+  }
+  return (entry && entry[parsed.category]) || null;
+}
+
 /**
  * { EnglishCountryName: [{ opponent, isHome, date }, ...] } from the
  * "Selections fixtures" tab -- one row per country, up to 4 opponent
@@ -814,6 +906,7 @@ function readPlayersInSelection_() {
       prenom: identity[i][COL_PRENOM - 1],
       posteFin: identity[i][COL_POSTE_FIN - 1],
       selection: sel,
+      lien: lienForSelection_(sel),
       matchs: matchs
     };
 

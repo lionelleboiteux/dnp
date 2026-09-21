@@ -162,6 +162,46 @@
     white-space: nowrap;
   }
   .no-match { font-size: 0.8rem; color: var(--muted); font-style: italic; margin: 0.4rem 0 0 3.25rem; }
+  .player-selection[data-clickable] {
+    cursor: zoom-in;
+    border: none;
+    font: inherit;
+    margin: 0;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  /* Full-image lightbox, opened by clicking a player's selection bubble --
+     same pattern as the groupes sibling project's team-photo lightbox. */
+  .lightbox {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+    cursor: zoom-out;
+  }
+  .lightbox.open { display: flex; }
+  .lightbox img {
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 8px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  }
+  .lightbox-close {
+    position: fixed;
+    top: 1rem;
+    right: 1.25rem;
+    color: #fff;
+    font-size: 2rem;
+    line-height: 1;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+  }
   .empty-state, .error-state {
     text-align: center;
     color: var(--muted);
@@ -205,6 +245,11 @@
   <fc-feedback project="DNP"></fc-feedback>
 </main>
 
+<div id="lightbox" class="lightbox">
+  <button type="button" class="lightbox-close" aria-label="Fermer">&times;</button>
+  <img id="lightbox-img" src="" alt="">
+</div>
+
 <footer class="site-footer">&copy;2026 by Fantasy Coach.</footer>
 
 <script>
@@ -220,6 +265,8 @@
   var statusLine = document.getElementById('status-line');
   var teamGrid = document.getElementById('team-grid');
   var lastUpdatedEl = document.getElementById('last-updated');
+  var lightbox = document.getElementById('lightbox');
+  var lightboxImg = document.getElementById('lightbox-img');
 
   function el(tag, attrs, children) {
     var e = document.createElement(tag);
@@ -234,6 +281,23 @@
   function setStatus(text) {
     statusLine.textContent = text || '';
   }
+
+  // Same lightbox pattern as the groupes sibling project's team-photo
+  // viewer -- opened by clicking a player's selection bubble when it has
+  // an image (see lienForSelection_ in Code.gs).
+  function openLightbox(src, alt) {
+    lightboxImg.src = src;
+    lightboxImg.alt = alt;
+    lightbox.classList.add('open');
+  }
+  function closeLightbox() {
+    lightbox.classList.remove('open');
+    lightboxImg.src = '';
+  }
+  lightbox.addEventListener('click', closeLightbox);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeLightbox();
+  });
 
   // Same map as index.html's TEAM_LOGOS -- duplicated rather than shared,
   // matching this repo's convention of each page being fully self-contained.
@@ -306,7 +370,21 @@
         var header = el('div', { class: 'player-header' });
         header.appendChild(el('span', { class: 'player-poste', text: j.posteFin || '' }));
         header.appendChild(el('span', { class: 'player-name', text: formatPlayerName(j.prenom, j.nom) }));
-        header.appendChild(el('span', { class: 'player-selection', text: j.selection || '' }));
+        if (j.lien) {
+          var selectionBtn = el('button', {
+            type: 'button',
+            class: 'player-selection',
+            'data-clickable': '',
+            text: j.selection || '',
+            'aria-label': 'Voir l’image pour ' + (j.selection || 'cette sélection'),
+          });
+          selectionBtn.addEventListener('click', function (selection, lien) {
+            return function () { openLightbox(lien, selection); };
+          }(j.selection || '', j.lien));
+          header.appendChild(selectionBtn);
+        } else {
+          header.appendChild(el('span', { class: 'player-selection', text: j.selection || '' }));
+        }
         block.appendChild(header);
 
         if (j.matchs && j.matchs.length) {
