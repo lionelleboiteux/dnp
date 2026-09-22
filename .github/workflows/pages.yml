@@ -15,6 +15,7 @@ on:
       - 'frontend/index.html'
       - 'frontend/suspensionsProchainJaune.html'
       - 'frontend/matchs-en-selection.html'
+      - 'frontend/og-image.jpg'
       - 'frontend/ads.txt'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
@@ -41,6 +42,7 @@ jobs:
           cp frontend/index.html _site/index.html
           cp frontend/suspensionsProchainJaune.html _site/suspensionsProchainJaune.html
           cp frontend/matchs-en-selection.html _site/matchs-en-selection.html
+          cp frontend/og-image.jpg _site/og-image.jpg
           cp frontend/ads.txt _site/ads.txt
           # Custom domain (DNS: l1.dnp.fantasy-coach.fr CNAME <github-user>.github.io).
           # Must be re-written on every deploy — GitHub Pages drops the custom
