@@ -301,11 +301,43 @@
   var PRONOS_API_BASE = 'https://dmytkubjxwwwkroutvdu.supabase.co/functions/v1/api';
   var PRONOS_L1_LEAGUE_ID = '27f27a15-02a9-448a-98d5-80998e2fa52e';
 
-  function fetchCurrentGameweekNumber() {
+  // The pronos API occasionally 500s (e.g. DB connection slots exhausted);
+  // r.json() then yields an error body with no `gameweek`, which used to fall
+  // through to journees[0] (Journée 1). Retry, then fall back to the last
+  // gameweek seen successfully.
+  var GW_CACHE_KEY = 'dnp:lastCurrentGameweek';
+
+  function fetchCurrentGameweekOnce() {
     return fetch(PRONOS_API_BASE + '/v1/leagues/' + PRONOS_L1_LEAGUE_ID + '/current')
-      .then(function (r) { return r.json(); })
-      .then(function (data) { return data && data.gameweek ? data.gameweek.number : null; })
-      .catch(function () { return null; });
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function (data) {
+        if (!data || !data.gameweek || data.gameweek.number == null) throw new Error('no gameweek');
+        return data.gameweek.number;
+      });
+  }
+
+  function fetchCurrentGameweekNumber() {
+    var attempt = 0;
+    function run() {
+      return fetchCurrentGameweekOnce().catch(function (err) {
+        if (++attempt >= 3) throw err;
+        return new Promise(function (res) { setTimeout(res, 800 * attempt); }).then(run);
+      });
+    }
+    return run()
+      .then(function (n) {
+        try { localStorage.setItem(GW_CACHE_KEY, String(n)); } catch (e) {}
+        return n;
+      })
+      .catch(function () {
+        try {
+          var cached = parseInt(localStorage.getItem(GW_CACHE_KEY), 10);
+          return isNaN(cached) ? null : cached;
+        } catch (e) { return null; }
+      });
   }
 
   // No picker on this page (unlike index.html) -- always shows the
