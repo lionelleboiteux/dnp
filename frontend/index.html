@@ -349,7 +349,9 @@
   // which also treats a trailing "?" as the same category); spell it out
   // for display without touching the raw category matching.
   function formatRaison(raison) {
-    return String(raison || '').replace(/^Susp(\s*\?)?$/, 'Suspendu$1');
+    return String(raison || '')
+      .replace(/^Susp(\s*\?)?$/, 'Suspendu$1')
+      .replace(/Suivi suspension/g, 'Accumulation de cartons jaunes');
   }
 
   function formatPlayerName(prenom, nom) {

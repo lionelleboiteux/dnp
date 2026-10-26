@@ -249,7 +249,7 @@
         var row = el('div', { class: 'player-row' });
         row.appendChild(el('span', { class: 'player-poste', text: j.posteFin || '' }));
         row.appendChild(el('span', { class: 'player-name', text: formatPlayerName(j.prenom, j.nom) }));
-        row.appendChild(el('span', { class: 'player-raison', text: j.raison || '' }));
+        row.appendChild(el('span', { class: 'player-raison', text: (j.raison || '').replace(/Suivi suspension/g, 'Accumulation de cartons jaunes') }));
         card.appendChild(row);
       });
       teamGrid.appendChild(card);
