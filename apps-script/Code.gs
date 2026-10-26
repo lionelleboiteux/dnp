@@ -531,7 +531,7 @@ function readPlayersAtRiskOfSuspension_(sheet, cartonCol) {
 
     var raisons = [];
     if (viaCarton) raisons.push(CARTON_SUSPENDED_LABEL);
-    if (viaSuivi) raisons.push('Suivi suspension (' + suiviVal + ')');
+    if (viaSuivi) raisons.push('Accumulation de cartons jaunes ('+ suiviVal + ')');
 
     var player = {
       nom: nom,
